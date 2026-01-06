@@ -40,7 +40,7 @@ export const BudgetProvider = ({ children }) => {
 
     // On écoute le document "budget_data" dans la collection "users"
     // Chaque utilisateur a son propre document basé sur son UID
-    const docRef = doc(db, "users", user.uid);
+    const docRef = doc(db, "budget_2026", user.uid);
 
     const unsubDoc = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -60,7 +60,7 @@ export const BudgetProvider = ({ children }) => {
   const saveData = async (newConfig, newMonthlyData) => {
     if (!user) return;
     try {
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "budget_2026", user.uid), {
         config: newConfig,
         monthlyData: newMonthlyData,
         lastUpdated: new Date()
