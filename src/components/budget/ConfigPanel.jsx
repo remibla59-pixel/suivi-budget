@@ -1,17 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useBudget } from '../../hooks/useBudget';
 import { Trash2, PlusCircle, Wallet } from 'lucide-react';
 
-// Composant Champ Intelligent (s'efface si valeur par défaut)
 const SmartInput = ({ value, onChange, placeholder, isNumber = false }) => {
   const handleFocus = (e) => {
     const val = e.target.value;
-    // Liste des mots-clés qui déclenchent l'effacement automatique
     if (val.includes('Nouveau') || val === '0') {
       onChange('');
     }
   };
-
   return (
     <input
       type={isNumber ? "number" : "text"}
@@ -34,7 +31,6 @@ const ConfigSection = ({ title, children }) => (
 export default function ConfigPanel() {
   const { config, updateConfigPoste, addConfigPoste, removeConfigPoste, updateAccountInitial } = useBudget();
 
-  // Helper pour générer une section de postes
   const renderPosteSection = (type, title) => (
     <ConfigSection title={title}>
       <div className="flex justify-end mb-2">
@@ -44,23 +40,12 @@ export default function ConfigPanel() {
       </div>
       {config.postes.filter(p => p.type === type).map(poste => (
         <div key={poste.id} className="flex gap-3 items-center">
-          <SmartInput 
-            value={poste.label} 
-            onChange={(v) => updateConfigPoste({ ...poste, label: v })} 
-            placeholder="Nom du poste"
-          />
+          <SmartInput value={poste.label} onChange={(v) => updateConfigPoste({ ...poste, label: v })} placeholder="Nom" />
           <div className="relative w-32">
-            <SmartInput 
-              isNumber 
-              value={poste.montant} 
-              onChange={(v) => updateConfigPoste({ ...poste, montant: parseFloat(v) || 0 })} 
-              placeholder="0"
-            />
+            <SmartInput isNumber value={poste.montant} onChange={(v) => updateConfigPoste({ ...poste, montant: parseFloat(v) || 0 })} placeholder="0" />
             <span className="absolute right-8 top-2 text-slate-400 pointer-events-none">€</span>
           </div>
-          <button onClick={() => removeConfigPoste(poste.id)} className="text-red-400 hover:text-red-600 p-2">
-            <Trash2 size={18} />
-          </button>
+          <button onClick={() => removeConfigPoste(poste.id)} className="text-red-400 hover:text-red-600 p-2"><Trash2 size={18} /></button>
         </div>
       ))}
     </ConfigSection>
@@ -68,24 +53,16 @@ export default function ConfigPanel() {
 
   return (
     <div className="max-w-3xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-6 text-slate-800 flex items-center gap-2">
-        🛠️ Configuration Générale
-      </h2>
+      <h2 className="text-2xl font-bold mb-6 text-slate-800 flex items-center gap-2">🛠️ Configuration Générale</h2>
       
-      {/* SOLDES DE DEPART */}
       <ConfigSection title="💰 Soldes de Départ (Livrets & Enveloppes)">
         <div className="grid gap-4">
           {config.comptes?.map(compte => (
             <div key={compte.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Wallet className="text-blue-500" size={20} />
-                <span className="font-medium text-slate-700">{compte.label}</span>
-              </div>
+              <div className="flex items-center gap-3"><Wallet className="text-blue-500" size={20} /><span className="font-medium text-slate-700">{compte.label}</span></div>
               <div className="flex items-center gap-2 relative">
                 <span className="text-sm text-slate-500">Initial :</span>
-                <div className="w-32">
-                   <SmartInput isNumber value={compte.initial} onChange={(v) => updateAccountInitial(compte.id, v)} />
-                </div>
+                <div className="w-32"><SmartInput isNumber value={compte.initial} onChange={(v) => updateAccountInitial(compte.id, v)} /></div>
                 <span className="text-slate-500">€</span>
               </div>
             </div>
@@ -93,12 +70,10 @@ export default function ConfigPanel() {
         </div>
       </ConfigSection>
 
-      {/* SECTIONS DEPENSES */}
-      {renderPosteSection('fixe', 'Dépenses Mensuelles Fixes')}
-      {renderPosteSection('annualise', 'Dépenses Mensuelles Annualisées (Provisions)')}
-      {renderPosteSection('obligatoire', 'Enveloppes Obligatoires')}
+      {renderPosteSection('fixe', 'Dépenses Mensuelles Fixes (Abonnements, Crédits)')}
+      {renderPosteSection('annualise', 'Provisions Annualisées (Impôts, Assurances)')}
+      {renderPosteSection('obligatoire', 'Dépenses Courantes (Enveloppes)')}
       {renderPosteSection('secondaire', 'Enveloppes Secondaires (Plaisirs)')}
-      
     </div>
   );
 }
