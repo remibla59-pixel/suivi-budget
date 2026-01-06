@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
 import { ChevronLeft, ChevronRight, Calculator, Plus, Trash2, Lock, CheckCircle, Circle, ArrowRightLeft, DollarSign } from 'lucide-react';
 
+const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
 const SmartInput = ({ value, onChange, placeholder, disabled, className, type="text" }) => {
   const handleFocus = (e) => {
     if (!disabled && (e.target.value.includes('Nouveau') || e.target.value === '0')) {
@@ -16,29 +18,38 @@ const SmartInput = ({ value, onChange, placeholder, disabled, className, type="t
   );
 };
 
-// COMPOSANT ENVELOPPE (Inchangé, je le garde pour la structure)
+// COMPOSANT ENVELOPPE (Accordéon)
 const EnvelopeCard = ({ poste, budget, report, expenses, onAdd, onRemove, isClosed }) => {
-   // ... (copier le code précédent d'EnvelopeCard) ...
-   // Pour gagner de la place ici, je suppose que vous gardez le même code qu'avant pour EnvelopeCard
-   // Si vous voulez que je le remette complet, dites le moi !
    const [isOpen, setIsOpen] = useState(false);
    const [newLabel, setNewLabel] = useState('');
    const [newAmount, setNewAmount] = useState('');
-   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
-   const available = (budget + (report || 0)) - totalSpent;
+   const totalSpent = round(expenses.reduce((sum, item) => sum + item.amount, 0));
+   const available = round((budget + (report || 0)) - totalSpent);
+   
    return (
     <div className="bg-white border border-slate-200 rounded-lg overflow-hidden mb-3 shadow-sm">
-       {/* ... Contenu enveloppe ... */}
-       <div onClick={() => setIsOpen(!isOpen)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50">
+       <div onClick={() => setIsOpen(!isOpen)} className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors">
           <div className="font-bold text-slate-700">{poste.label}</div>
           <div className={`font-mono font-bold ${available<0?'text-red-500':'text-emerald-600'}`}>{available}€</div>
        </div>
        {isOpen && (
          <div className="p-4 bg-slate-50 border-t">
-            {expenses.map(e => (
-               <div key={e.id} className="flex justify-between text-sm mb-2"><span>{e.label}</span><span>{e.amount}€ <button onClick={()=>onRemove(e.id)}><Trash2 size={12}/></button></span></div>
-            ))}
-            {!isClosed && <div className="flex gap-2"><input value={newLabel} onChange={e=>setNewLabel(e.target.value)} placeholder="Note" className="border p-1 flex-1"/><input value={newAmount} onChange={e=>setNewAmount(e.target.value)} placeholder="0" className="border p-1 w-20"/><button onClick={()=>{onAdd(poste.id, newLabel, newAmount);setNewAmount('');setNewLabel('')}}><Plus size={16}/></button></div>}
+            <div className="space-y-2 mb-3">
+              {expenses.map(e => (
+                 <div key={e.id} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-slate-100">
+                   <span className="text-slate-700">{e.label}</span>
+                   <span className="font-bold flex items-center gap-2">{e.amount}€ {!isClosed && <button onClick={()=>onRemove(e.id)} className="text-red-300 hover:text-red-500"><Trash2 size={12}/></button>}</span>
+                 </div>
+              ))}
+              {expenses.length === 0 && <div className="text-xs text-slate-400 italic">Vide</div>}
+            </div>
+            {!isClosed && (
+              <div className="flex gap-2">
+                <input value={newLabel} onChange={e=>setNewLabel(e.target.value)} placeholder="Note" className="border p-2 rounded text-sm flex-1 outline-none focus:border-blue-400"/>
+                <input type="number" value={newAmount} onChange={e=>setNewAmount(e.target.value)} placeholder="0" className="border p-2 rounded text-sm w-20 text-right outline-none focus:border-blue-400"/>
+                <button onClick={()=>{if(newLabel && newAmount){onAdd(poste.id, newLabel, newAmount);setNewAmount('');setNewLabel('')}}} className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"><Plus size={16}/></button>
+              </div>
+            )}
          </div>
        )}
     </div>
@@ -47,57 +58,54 @@ const EnvelopeCard = ({ poste, budget, report, expenses, onAdd, onRemove, isClos
 
 export default function MonthView() {
   const { config, monthlyData, addIncomeLine, updateIncomeLine, removeIncomeLine, updateFixedExpense, toggleFixedCheck, addVariableExpense, removeVariableExpense, toggleMonthlyProvision, addProvisionExpense, removeProvisionExpense, validateMonth } = useBudget();
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // Format YYYY-MM
+  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const mData = monthlyData[currentMonth] || {};
   const isClosed = mData.isClosed;
   const currentYear = currentMonth.split('-')[0];
 
-  // 1. REVENUS
+  // DONNEES CALCULÉES
   const revenusList = mData.revenusList || [];
-  const totalRevenus = revenusList.reduce((sum, item) => sum + (item.montant || 0), 0);
+  const totalRevenus = round(revenusList.reduce((sum, item) => sum + (item.montant || 0), 0));
 
-  // 2. PROVISIONS (Calcul du montant à virer ce mois-ci)
   const provisionsOfYear = config.provisionsByYear?.[currentYear] || [];
-  const totalAnnualProvisions = provisionsOfYear.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalAnnualProvisions = round(provisionsOfYear.reduce((sum, p) => sum + (p.amount || 0), 0));
   const monthlyProvisionAmount = Math.round(totalAnnualProvisions / 12);
   const isProvisionDone = mData.provisionDone || false;
 
-  // 3. DEPENSES
   const varExpensesList = mData.variableExpenses || [];
-  const getVarTotal = (pid) => varExpensesList.filter(v => v.posteId === pid).reduce((sum, v) => sum + v.amount, 0);
+  const getVarTotal = (pid) => round(varExpensesList.filter(v => v.posteId === pid).reduce((sum, v) => sum + v.amount, 0));
 
   const calcTotalByType = (type) => config.postes.filter(p => p.type === type).reduce((sum, p) => {
       if (type === 'obligatoire' || type === 'secondaire') return sum + getVarTotal(p.id);
       return sum + (mData.depenses?.[p.id] !== undefined ? mData.depenses[p.id] : p.montant);
   }, 0);
 
-  const totalFixe = calcTotalByType('fixe'); 
-  const totalVariable = calcTotalByType('obligatoire') + calcTotalByType('secondaire');
-  const totalEpargne = config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0);
+  const totalFixe = round(calcTotalByType('fixe')); 
+  const totalVariable = round(calcTotalByType('obligatoire') + calcTotalByType('secondaire'));
+  const totalEpargne = round(config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0));
+  const totalSorties = round(totalFixe + totalVariable + totalEpargne + (isProvisionDone ? monthlyProvisionAmount : 0));
+  const resteAVivre = round(totalRevenus - totalSorties);
 
-  // TOTAL SORTIES = Fixes + Variables + Epargne + Virement Provision (si fait)
-  const totalSorties = totalFixe + totalVariable + totalEpargne + (isProvisionDone ? monthlyProvisionAmount : 0);
-  const resteAVivre = totalRevenus - totalSorties;
-
-  // Gestion des dépenses sur provision (Selecteur)
+  // ÉTAT LOCAL POUR L'AJOUT DE DÉPENSE PROVISION
   const [selectedProvId, setSelectedProvId] = useState('');
+  const [provExpenseNote, setProvExpenseNote] = useState(''); // Nouveau : Note perso
   const [provExpenseAmount, setProvExpenseAmount] = useState('');
 
   const handleAddProvExpense = () => {
     if (selectedProvId && provExpenseAmount) {
-      const label = provisionsOfYear.find(p => p.id === selectedProvId)?.label || 'Dépense';
-      addProvisionExpense(currentMonth, selectedProvId, label, provExpenseAmount);
+      // Si l'utilisateur met une note, on l'utilise, sinon on prend le nom de la facture
+      const defaultLabel = provisionsOfYear.find(p => p.id === selectedProvId)?.label || 'Facture';
+      const finalLabel = provExpenseNote ? `${defaultLabel} (${provExpenseNote})` : defaultLabel;
+      
+      addProvisionExpense(currentMonth, selectedProvId, finalLabel, provExpenseAmount);
       setProvExpenseAmount('');
+      setProvExpenseNote('');
       setSelectedProvId('');
     }
   };
 
-  // NAVIGATION DATE
-  const changeMonth = (offset) => {
-    const d = new Date(currentMonth + "-01"); d.setMonth(d.getMonth() + offset);
-    setCurrentMonth(d.toISOString().slice(0, 7));
-  };
+  const changeMonth = (offset) => { const d = new Date(currentMonth + "-01"); d.setMonth(d.getMonth() + offset); setCurrentMonth(d.toISOString().slice(0, 7)); };
   const changeYear = (e) => { const year = e.target.value; const month = currentMonth.split('-')[1]; setCurrentMonth(`${year}-${month}`); };
   const handleValidate = () => { if (window.confirm("Clôturer le mois ?")) { const next = validateMonth(currentMonth); setCurrentMonth(next); }};
 
@@ -144,7 +152,7 @@ export default function MonthView() {
         </div>
         
         <div className="p-4 space-y-6">
-          {/* PARTIE 1 : LE VIREMENT MENSUEL */}
+          {/* Virement Mensuel */}
           <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
             <div>
               <div className="font-bold text-slate-700">Epargne Mensuelle Globale</div>
@@ -159,11 +167,11 @@ export default function MonthView() {
             </button>
           </div>
 
-          {/* PARTIE 2 : SAISIR UNE DEPENSE SUR PROVISION */}
+          {/* Paiement Factures */}
           <div className="bg-slate-50 p-3 rounded-lg">
-             <div className="text-xs font-bold text-slate-400 uppercase mb-2">Dépenser une provision (Payer une facture)</div>
+             <div className="text-xs font-bold text-slate-400 uppercase mb-2">Payer une facture provisionnée</div>
              
-             {/* Liste des dépenses déjà saisies ce mois-ci */}
+             {/* Liste */}
              {(mData.provisionExpenses || []).map(exp => (
                <div key={exp.id} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-slate-200 mb-2">
                  <span className="font-medium text-slate-700">{exp.label}</span>
@@ -174,20 +182,28 @@ export default function MonthView() {
                </div>
              ))}
 
-             {/* Formulaire d'ajout */}
+             {/* Formulaire complet avec Note */}
              {!isClosed && (
-               <div className="flex flex-col sm:flex-row gap-2 mt-2">
+               <div className="flex flex-col gap-2 mt-2">
                  <select 
                     value={selectedProvId}
                     onChange={(e) => setSelectedProvId(e.target.value)}
-                    className="flex-1 p-2 border rounded text-sm bg-white outline-none"
+                    className="w-full p-2 border rounded text-sm bg-white outline-none"
                  >
-                   <option value="">-- Choisir la facture payée --</option>
+                   <option value="">-- Choisir la facture --</option>
                    {provisionsOfYear.map(p => (
                      <option key={p.id} value={p.id}>{p.label} (Prévu: {p.amount}€)</option>
                    ))}
                  </select>
+                 
                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      placeholder="Petite note (ex: Régularisation, Fournitures...)"
+                      value={provExpenseNote}
+                      onChange={(e) => setProvExpenseNote(e.target.value)}
+                      className="flex-1 p-2 border rounded text-sm outline-none"
+                    />
                     <input 
                       type="number" 
                       placeholder="Montant" 
@@ -209,19 +225,25 @@ export default function MonthView() {
         </div>
       </div>
 
-      {/* --- AUTRES SECTIONS (Fixes & Enveloppes) --- */}
+      {/* --- CHARGES FIXES (Style amélioré) --- */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden p-4">
         <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Lock size={18}/> Charges Fixes</h3>
         {config.postes.filter(p => p.type === 'fixe').map(p => {
             const isChecked = mData.fixedStatus?.[p.id] || false;
+            // CHANGEMENT DE STYLE : Vert validé au lieu de barré
+            const bgClass = isChecked ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100';
+            const textClass = isChecked ? 'text-emerald-700 font-bold' : 'text-slate-700 font-medium';
+            
             return (
-              <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border mb-2 transition-all ${isChecked ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}`}>
+              <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border mb-2 transition-all ${bgClass}`}>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-colors ${isChecked ? 'text-emerald-500' : 'text-slate-300 hover:text-slate-400'}`}>{isChecked ? <CheckCircle size={24} fill="currentColor" className="text-white" /> : <Circle size={24} />}</button>
-                  <span className={`font-medium ${isChecked ? 'text-emerald-800 line-through opacity-70' : 'text-slate-700'}`}>{p.label}</span>
+                  <button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-colors ${isChecked ? 'text-emerald-600' : 'text-slate-300 hover:text-slate-400'}`}>
+                    {isChecked ? <CheckCircle size={24} fill="currentColor" className="text-white" /> : <Circle size={24} />}
+                  </button>
+                  <span className={textClass}>{p.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <SmartInput type="number" disabled={isClosed} value={mData.depenses?.[p.id] ?? p.montant} onChange={(v) => updateFixedExpense(currentMonth, p.id, v)} className={`w-24 text-right p-1 bg-transparent border-b outline-none font-mono font-bold ${isChecked ? 'text-emerald-600 border-emerald-200' : 'text-slate-700 border-slate-300'}`} /><span className="text-xs text-slate-400">€</span>
+                  <SmartInput type="number" disabled={isClosed} value={mData.depenses?.[p.id] ?? p.montant} onChange={(v) => updateFixedExpense(currentMonth, p.id, v)} className={`w-24 text-right p-1 bg-transparent border-b outline-none font-mono font-bold ${isChecked ? 'text-emerald-700 border-emerald-300' : 'text-slate-700 border-slate-300'}`} /><span className="text-xs text-slate-400">€</span>
                 </div>
               </div>
             );
