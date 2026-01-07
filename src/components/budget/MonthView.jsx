@@ -222,22 +222,19 @@ export default function MonthView() {
         
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-3">
-            {isClosed ? (
+            <span className="text-2xl font-black capitalize">
+               {new Date(currentMonth + "-01").toLocaleDateString('fr-FR', { month: 'long' })}
+            </span>
+            {isClosed && (
                <button 
                  onClick={handleReopen} 
-                 className="flex items-center gap-2 bg-slate-600 hover:bg-slate-500 px-4 py-1.5 rounded-full border border-slate-500 text-sm font-bold transition-all group"
+                 className="flex items-center gap-2 bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded-full border border-slate-500 text-xs font-bold transition-all group ml-2"
                  title="Cliquez pour rouvrir"
                >
-                 <Lock size={16} className="text-orange-300" /> 
-                 <span>Mois Clôturé</span>
-                 <LockOpen size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-white"/>
+                 <Lock size={12} className="text-orange-300" /> 
+                 <span>Fermé</span>
                </button>
-            ) : (
-               <span className="text-2xl font-black capitalize">
-                 {new Date(currentMonth + "-01").toLocaleDateString('fr-FR', { month: 'long' })}
-               </span>
             )}
-            
             <select 
               value={currentYear} 
               onChange={(e) => {
@@ -320,7 +317,7 @@ export default function MonthView() {
         </div>
       </div>
 
-      {/* 3. SECTION ENVELOPPES COURANTES */}
+      {/* 3. SECTION ENVELOPPES COURANTES (4 colonnes) */}
       <section>
         <h3 className="font-black text-slate-800 flex items-center gap-2 mt-8 text-lg mb-4">
           <Wallet size={20} className="text-emerald-500"/> Dépenses Courantes (Enveloppes)
