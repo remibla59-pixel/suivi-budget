@@ -3,7 +3,7 @@ import { useBudget } from '../../hooks/useBudget';
 import { 
   ChevronLeft, ChevronRight, Plus, Trash2, 
   Lock, CheckCircle, Circle, ArrowRightLeft, 
-  Wallet, ShoppingBag, CreditCard, Coins // <-- J'ai ajouté Coins ici
+  Wallet, ShoppingBag, CreditCard, Coins, DollarSign // <-- Ajout de DollarSign ici
 } from 'lucide-react';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
