@@ -3,7 +3,7 @@ import { useBudget } from '../../hooks/useBudget';
 import { 
   ChevronLeft, ChevronRight, Plus, Trash2, 
   Lock, CheckCircle, Circle, ArrowRightLeft, 
-  Wallet, ShoppingBag, CreditCard, Coins, DollarSign // <-- Ajout de DollarSign ici
+  Wallet, ShoppingBag, CreditCard, Coins, DollarSign 
 } from 'lucide-react';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
@@ -126,19 +126,27 @@ export default function MonthView() {
     updateFixedExpense, toggleFixedCheck, fundEnvelope, spendEnvelope, removeEnvelopeExpense, 
     toggleMonthlyProvision, addProvisionExpense, removeProvisionExpense, validateMonth, reopenMonth,
     addFlexibleExpense, removeFlexibleExpense,
-    currentMonth, setCurrentMonth // Récupération depuis Context
+    currentMonth, setCurrentMonth 
   } = useBudget();
 
   const mData = monthlyData[currentMonth] || {};
   const isClosed = mData.isClosed;
   const currentYear = currentMonth.split('-')[0];
+  const nextYear = String(parseInt(currentYear) + 1); // Année N+1 pour le virement
 
   const revenusList = mData.revenusList || [];
   const totalRevenus = round(revenusList.reduce((sum, item) => sum + (item.montant || 0), 0));
-  const provisionsOfYear = config.provisionsByYear?.[currentYear] || [];
-  const totalAnnualProvisions = round(provisionsOfYear.reduce((sum, p) => sum + (p.amount || 0), 0));
-  const monthlyProvisionAmount = Math.round(totalAnnualProvisions / 12);
+  
+  // --- LOGIQUE PROVISIONS DÉCALÉE ---
+  // 1. Pour le paiement (Dépenses) : On utilise l'année en cours (N)
+  const provisionsCurrentYear = config.provisionsByYear?.[currentYear] || [];
+  
+  // 2. Pour le virement (Épargne) : On utilise l'année prochaine (N+1)
+  const provisionsNextYear = config.provisionsByYear?.[nextYear] || [];
+  const totalAnnualProvisionsNextYear = round(provisionsNextYear.reduce((sum, p) => sum + (p.amount || 0), 0));
+  const monthlyProvisionAmount = Math.round(totalAnnualProvisionsNextYear / 12);
   const isProvisionDone = mData.provisionDone || false;
+
   const totalFixe = round(config.postes.filter(p => p.type === 'fixe').reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
   const totalEpargne = round(config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0));
   const fundedEnvelopesAmount = config.envelopes.reduce((sum, env) => sum + (mData[`funded_${env.id}`] ? env.budgetMonthly : 0), 0);
@@ -156,7 +164,8 @@ export default function MonthView() {
 
   const handleAddProvExpense = () => {
     if (selectedProvId && provExpenseAmount) {
-      const defaultLabel = provisionsOfYear.find(p => p.id === selectedProvId)?.label || 'Facture';
+      // On cherche le label dans la liste de l'année COURANTE
+      const defaultLabel = provisionsCurrentYear.find(p => p.id === selectedProvId)?.label || 'Facture';
       const finalLabel = provExpenseNote ? `${defaultLabel} (${provExpenseNote})` : defaultLabel;
       addProvisionExpense(currentMonth, selectedProvId, finalLabel, provExpenseAmount);
       setProvExpenseAmount(''); setProvExpenseNote(''); setSelectedProvId('');
@@ -262,18 +271,32 @@ export default function MonthView() {
 
       {/* 4. PROVISIONS */}
       <section className="bg-white rounded-3xl shadow-sm overflow-hidden border border-blue-100 mt-10">
-        <div className="p-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center"><h3 className="font-black text-blue-900 flex items-center gap-2"><ArrowRightLeft size={20}/> Provisions Annualisées</h3><div className="text-xs font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">Livret Rémi</div></div>
+        <div className="p-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center">
+          <h3 className="font-black text-blue-900 flex items-center gap-2"><ArrowRightLeft size={20}/> Provisions Annualisées</h3>
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">
+            Livret Rémi
+          </div>
+        </div>
         <div className="p-6 space-y-6">
+          
+          {/* Virement (Basé sur N+1) */}
           <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-5 rounded-2xl border border-slate-100 shadow-sm gap-4">
-            <div><div className="font-black text-slate-800">Épargne Mensuelle Lissée</div><div className="text-xs text-slate-400 font-bold tracking-wider">Cible : {monthlyProvisionAmount}€ / mois</div></div>
+            <div>
+              <div className="font-black text-slate-800">Épargne Mensuelle Lissée</div>
+              <div className="text-xs text-slate-400 font-bold tracking-wider">
+                Cible ({nextYear}) : {monthlyProvisionAmount}€ / mois
+              </div>
+            </div>
             <button onClick={() => toggleMonthlyProvision(currentMonth, monthlyProvisionAmount)} disabled={isClosed} className={`w-full sm:w-auto px-8 py-3 rounded-2xl font-black transition-all ${isProvisionDone ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-600 text-white hover:bg-black shadow-lg shadow-blue-100'}`}>{isProvisionDone ? 'Virement Effectué' : 'Confirmer le virement'}</button>
           </div>
+
+          {/* Paiement Factures (Basé sur N) */}
           <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-100">
-             <div className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Payer une facture via les provisions</div>
+             <div className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Payer une facture via les provisions ({currentYear})</div>
              <div className="space-y-2">{(mData.provisionExpenses || []).map(exp => (<div key={exp.id} className="flex justify-between items-center text-xs bg-white p-3 rounded-xl border border-slate-100 shadow-sm"><span className="font-bold text-slate-700">{exp.label}</span><div className="flex items-center gap-4"><span className="font-black text-orange-600">{round(exp.amount)} €</span>{!isClosed && <button onClick={() => removeProvisionExpense(currentMonth, exp.id, exp.amount, exp.provisionId)} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>}</div></div>))}</div>
              {!isClosed && (
                <div className="flex flex-col gap-3 mt-5">
-                 <select value={selectedProvId} onChange={(e) => setSelectedProvId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"><option value="">-- Choisir la charge --</option>{provisionsOfYear.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}</select>
+                 <select value={selectedProvId} onChange={(e) => setSelectedProvId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"><option value="">-- Choisir la charge à payer --</option>{provisionsCurrentYear.map(p => (<option key={p.id} value={p.id}>{p.label} (Prévu: {p.amount}€)</option>))}</select>
                  <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black shadow-lg shadow-orange-100"><DollarSign size={20} /></button></div>
                </div>
              )}

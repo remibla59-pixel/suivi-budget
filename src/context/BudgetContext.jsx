@@ -38,7 +38,7 @@ export const BudgetProvider = ({ children }) => {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [monthlyData, setMonthlyData] = useState({});
   
-  // PERSISTANCE : On garde le mois actif ici pour qu'il ne reset pas
+  // Persistance de l'onglet mois
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
 
   // --- AUTH & SYNC ---
@@ -51,56 +51,45 @@ export const BudgetProvider = ({ children }) => {
   // --- HELPER COMPTES ---
   const updateAccountInitial = (id, v) => { const n={...config, comptes:config.comptes.map(c=>c.id===id?{...c, initial:parseFloat(v)||0}:c)}; setConfig(n); saveData(n, monthlyData); };
 
-  // --- GESTION PROJETS MULTI-COMPTES ---
-  
-  // Création : allocations est un objet { 'ldd': 500, 'casden': 200 }
-  const addProject = (label, target, allocations) => {
-    const newProject = { 
-      id: Date.now().toString(), 
-      label, 
-      target: parseFloat(target), 
-      allocations: allocations // Ex: { ldd: 100, casden: 0 }
+  // --- NOUVEAU : SAUVEGARDE DONNÉES ANALYSE (Allocation surplus + Notes) ---
+  const updateAnalysisData = (monthKey, field, value) => {
+    const mData = monthlyData[monthKey] || {};
+    const newMData = {
+      ...monthlyData,
+      [monthKey]: {
+        ...mData,
+        [field]: field.includes('note') ? value : (parseFloat(value) || 0)
+      }
     };
+    setMonthlyData(newMData);
+    saveData(config, newMData);
+  };
+
+  // --- GESTION PROJETS ---
+  const addProject = (label, target, allocations) => {
+    const newProject = { id: Date.now().toString(), label, target: parseFloat(target), allocations };
     const n = { ...config, projects: [...(config.projects || []), newProject] };
     setConfig(n); saveData(n, monthlyData);
   };
-
-  const removeProject = (id) => {
-    const n = { ...config, projects: (config.projects || []).filter(p => p.id !== id) };
-    setConfig(n); saveData(n, monthlyData);
-  };
-
-  // Financement : On choisit vers quel compte (targetAccountId) on envoie l'argent
+  const removeProject = (id) => { const n = { ...config, projects: (config.projects || []).filter(p => p.id !== id) }; setConfig(n); saveData(n, monthlyData); };
   const fundProject = (projectId, amount, targetAccountId) => {
     const val = parseFloat(amount) || 0;
     const project = (config.projects || []).find(p => p.id === projectId);
     if (!project) return;
-
-    // 1. Mouvement bancaire : Courant -> Compte Cible (LDD ou CASDEN)
     const updatedComptes = config.comptes.map(c => {
       if (c.type === 'courant') return { ...c, initial: c.initial - val };
       if (c.id === targetAccountId) return { ...c, initial: c.initial + val };
       return c;
     });
-
-    // 2. Mise à jour de l'allocation spécifique du projet
     const currentAllocation = project.allocations[targetAccountId] || 0;
     const updatedAllocations = { ...project.allocations, [targetAccountId]: currentAllocation + val };
-
-    const updatedProjects = config.projects.map(p => 
-      p.id === projectId ? { ...p, allocations: updatedAllocations } : p
-    );
-    
+    const updatedProjects = config.projects.map(p => p.id === projectId ? { ...p, allocations: updatedAllocations } : p);
     const n = { ...config, comptes: updatedComptes, projects: updatedProjects };
     setConfig(n); saveData(n, monthlyData);
   };
 
   // --- BUDGETS FLEXIBLES ---
-  const updateFlexibleBudget = (id, newBudget) => {
-    const n = { ...config, budgetsFlexibles: config.budgetsFlexibles.map(b => b.id === id ? { ...b, budget: parseFloat(newBudget) || 0 } : b) };
-    setConfig(n); saveData(n, monthlyData);
-  };
-
+  const updateFlexibleBudget = (id, newBudget) => { const n = { ...config, budgetsFlexibles: config.budgetsFlexibles.map(b => b.id === id ? { ...b, budget: parseFloat(newBudget) || 0 } : b) }; setConfig(n); saveData(n, monthlyData); };
   const addFlexibleExpense = (monthKey, catId, label, amount) => {
     const mData = monthlyData[monthKey] || {};
     if (mData.isClosed) return;
@@ -111,7 +100,6 @@ export const BudgetProvider = ({ children }) => {
     const newConfig = { ...config, comptes: updatedComptes };
     setConfig(newConfig); setMonthlyData(newMData); saveData(newConfig, newMData);
   };
-
   const removeFlexibleExpense = (monthKey, expenseId, amount) => {
     const mData = monthlyData[monthKey];
     if (mData.isClosed) return;
@@ -122,7 +110,7 @@ export const BudgetProvider = ({ children }) => {
     setConfig(newConfig); setMonthlyData(newMData); saveData(newConfig, newMData);
   };
 
-  // --- FONCTIONS EXISTANTES (COMPRESSÉES) ---
+  // --- FONCTIONS EXISTANTES ---
   const transferToSavings=(a,n)=>{const v=parseFloat(a)||0;const uC=config.comptes.map(c=>{if(c.type==='courant')return{...c,initial:c.initial-v};if(c.id===config.savingsAccountId)return{...c,initial:c.initial+v};return c;});const h={id:Date.now(),date:new Date().toLocaleDateString(),type:'depot',amount:v,note:n||'Virement'};const nc={...config,comptes:uC,savingsHistory:[h,...(config.savingsHistory||[])].slice(0,50)};setConfig(nc);saveData(nc,monthlyData);};
   const retrieveFromSavings=(a,n)=>{const v=parseFloat(a)||0;const uC=config.comptes.map(c=>{if(c.type==='courant')return{...c,initial:c.initial+v};if(c.id===config.savingsAccountId)return{...c,initial:c.initial-v};return c;});const h={id:Date.now(),date:new Date().toLocaleDateString(),type:'retrait',amount:v,note:n||'Retrait'};const nc={...config,comptes:uC,savingsHistory:[h,...(config.savingsHistory||[])].slice(0,50)};setConfig(nc);saveData(nc,monthlyData);};
   const updateConfigPoste = (p) => { const n={...config, postes:config.postes.map(x=>x.id===p.id?p:x)}; setConfig(n); saveData(n, monthlyData); };
@@ -169,7 +157,9 @@ export const BudgetProvider = ({ children }) => {
       updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig, fundEnvelope, spendEnvelope, removeEnvelopeExpense,
       transferToSavings, retrieveFromSavings,
       addProject, removeProject, fundProject,
-      updateFlexibleBudget, addFlexibleExpense, removeFlexibleExpense
+      updateFlexibleBudget, addFlexibleExpense, removeFlexibleExpense,
+      // NOUVEAU
+      updateAnalysisData
     }}>
       {children}
     </BudgetContext.Provider>

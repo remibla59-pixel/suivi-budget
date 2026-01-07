@@ -7,11 +7,12 @@ import MonthView from './components/budget/MonthView';
 import AnnualView from './components/budget/AnnualView'; 
 import EnvelopesConfigView from './components/budget/EnvelopesConfigView';
 import SavingsView from './components/budget/SavingsView';
-import ProjectsView from './components/budget/ProjectsView'; // NOUVEAU
+import ProjectsView from './components/budget/ProjectsView';
+import AnalysisView from './components/budget/AnalysisView'; // <-- NOUVEAU IMPORT
 
 import { 
   LayoutDashboard, Settings, LogOut, Loader2, 
-  PiggyBank, Wallet, ShieldCheck, Target 
+  PiggyBank, Wallet, ShieldCheck, Target, BarChart3 // <-- ICONE
 } from 'lucide-react';
 
 function AppContent() {
@@ -41,7 +42,6 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans">
-      {/* BARRE DE NAVIGATION */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4 overflow-x-auto">
           
@@ -63,6 +63,7 @@ function AppContent() {
             <NavButton active={view === 'month'} onClick={() => setView('month')} icon={LayoutDashboard} label="Mensuel" />
             <NavButton active={view === 'envelopes'} onClick={() => setView('envelopes')} icon={Wallet} label="Env." />
             <NavButton active={view === 'annual'} onClick={() => setView('annual')} icon={PiggyBank} label="Prov." />
+            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={BarChart3} label="Année" />
             <NavButton active={view === 'projects'} onClick={() => setView('projects')} icon={Target} label="Projets" />
             <NavButton active={view === 'savings'} onClick={() => setView('savings')} icon={ShieldCheck} label="Épargne" />
             <NavButton active={view === 'config'} onClick={() => setView('config')} icon={Settings} label="Config" />
@@ -74,11 +75,11 @@ function AppContent() {
         </div>
       </nav>
 
-      {/* CONTENU PRINCIPAL */}
       <main className="py-8 animate-in fade-in duration-500">
         {view === 'month' && <MonthView />}
         {view === 'envelopes' && <EnvelopesConfigView />}
         {view === 'annual' && <AnnualView />} 
+        {view === 'analysis' && <AnalysisView />} 
         {view === 'projects' && <ProjectsView />}
         {view === 'savings' && <SavingsView />}
         {view === 'config' && <ConfigPanel />}
