@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, deleteDoc } from "firebase/firestore";
 
 export const BudgetContext = createContext();
 
@@ -27,8 +27,8 @@ const DEFAULT_CONFIG = {
   epargneCibles: [
     { id: 'ep1', label: 'Camping Car', objectif: 30000, mensuel: 1000 }
   ],
-  provisionAccountId: 'livretRemi', // Rémi = Provisions annualisées
-  savingsAccountId: 'livretA'      // Véro = Epargne précaution
+  provisionAccountId: 'livretRemi',
+  savingsAccountId: 'livretA'
 };
 
 export const BudgetProvider = ({ children }) => {
@@ -37,7 +37,7 @@ export const BudgetProvider = ({ children }) => {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [monthlyData, setMonthlyData] = useState({});
 
-  // --- SYNCHRONISATION FIREBASE ---
+  // --- AUTH ET SYNC ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -72,7 +72,27 @@ export const BudgetProvider = ({ children }) => {
   const login = () => signInWithPopup(auth, googleProvider);
   const logout = () => signOut(auth);
 
-  // --- ACTIONS DE CONFIGURATION GENERALE ---
+  // --- RESET GLOBAL ---
+  const resetAllData = async () => {
+    if (!user) return;
+    if (window.confirm("⚠️ ATTENTION : Voulez-vous vraiment TOUT supprimer ? Cette action est irréversible.")) {
+      if (window.confirm("DERNIÈRE CONFIRMATION : Vous allez perdre tous vos suivis mensuels et votre configuration.")) {
+        await deleteDoc(doc(db, "budget_2026", user.uid));
+        window.location.reload();
+      }
+    }
+  };
+
+  // --- CONFIG COMPTES ET POSTES ---
+  const updateAccountInitial = (id, amount) => {
+    const newConfig = {
+      ...config,
+      comptes: config.comptes.map(c => c.id === id ? { ...c, initial: parseFloat(amount) || 0 } : c)
+    };
+    setConfig(newConfig);
+    saveData(newConfig, monthlyData);
+  };
+
   const updateConfigPoste = (poste) => {
     const newConfig = {
       ...config,
@@ -83,8 +103,10 @@ export const BudgetProvider = ({ children }) => {
   };
 
   const addConfigPoste = (type) => {
-    const newPoste = { id: Date.now().toString(), label: 'Nouveau Poste', type, montant: 0 };
-    const newConfig = { ...config, postes: [...config.postes, newPoste] };
+    const newConfig = { 
+      ...config, 
+      postes: [...config.postes, { id: Date.now().toString(), label: 'Nouveau', type, montant: 0 }] 
+    };
     setConfig(newConfig);
     saveData(newConfig, monthlyData);
   };
@@ -95,22 +117,13 @@ export const BudgetProvider = ({ children }) => {
     saveData(newConfig, monthlyData);
   };
 
-  const updateAccountInitial = (id, amount) => {
-    const newConfig = {
-      ...config,
-      comptes: config.comptes.map(c => c.id === id ? { ...c, initial: parseFloat(amount) || 0 } : c)
-    };
-    setConfig(newConfig);
-    saveData(newConfig, monthlyData);
-  };
-
   const setProvisionAccount = (id) => {
     const newConfig = { ...config, provisionAccountId: id };
     setConfig(newConfig);
     saveData(newConfig, monthlyData);
   };
 
-  // --- ACTIONS ENVELOPPES ---
+  // --- ACTIONS ENVELOPPES (Persistantes) ---
   const updateEnvelopeConfig = (env) => {
     const newConfig = {
       ...config,
@@ -121,8 +134,10 @@ export const BudgetProvider = ({ children }) => {
   };
 
   const addEnvelopeConfig = (category) => {
-    const newEnv = { id: Date.now().toString(), label: 'Nouvelle Enveloppe', category, budgetMonthly: 0, currentBalance: 0 };
-    const newConfig = { ...config, envelopes: [...config.envelopes, newEnv] };
+    const newConfig = { 
+      ...config, 
+      envelopes: [...config.envelopes, { id: Date.now().toString(), label: 'Nouvelle', category, budgetMonthly: 0, currentBalance: 0 }] 
+    };
     setConfig(newConfig);
     saveData(newConfig, monthlyData);
   };
@@ -158,9 +173,10 @@ export const BudgetProvider = ({ children }) => {
     const mData = monthlyData[monthKey] || {};
     if (mData.isClosed) return;
 
-    const expenseItem = { id: Date.now(), envId, label, amount: parseFloat(amount) || 0 };
+    const val = parseFloat(amount) || 0;
+    const expenseItem = { id: Date.now(), envId, label, amount: val };
     const updatedEnvelopes = config.envelopes.map(e => 
-      e.id === envId ? { ...e, currentBalance: e.currentBalance - expenseItem.amount } : e
+      e.id === envId ? { ...e, currentBalance: e.currentBalance - val } : e
     );
 
     const newMData = { 
@@ -180,8 +196,9 @@ export const BudgetProvider = ({ children }) => {
     const mData = monthlyData[monthKey];
     if (mData.isClosed) return;
 
+    const val = parseFloat(amount) || 0;
     const updatedEnvelopes = config.envelopes.map(e => 
-      e.id === envId ? { ...e, currentBalance: e.currentBalance + parseFloat(amount) } : e
+      e.id === envId ? { ...e, currentBalance: e.currentBalance + val } : e
     );
     const newMData = { 
       ...monthlyData, 
@@ -196,7 +213,7 @@ export const BudgetProvider = ({ children }) => {
     saveData(newConfig, newMData);
   };
 
-  // --- ACTIONS PROVISIONS (VUE ANNUELLE) ---
+  // --- ACTIONS PROVISIONS (AnnualView) ---
   const addProvisionItem = (year) => {
     const list = config.provisionsByYear?.[year] || [];
     const newItem = { id: Date.now().toString(), label: 'Nouvelle Charge', amount: 0, spent: 0, history: [] };
@@ -314,7 +331,7 @@ export const BudgetProvider = ({ children }) => {
     saveData(newConfig, newMData);
   };
 
-  // --- ACTIONS EPARGNE PRECAUTION ---
+  // --- ACTIONS EPARGNE PRECAUTION (Véro) ---
   const transferToSavings = (amount) => {
     const val = parseFloat(amount) || 0;
     const updatedComptes = config.comptes.map(c => {
@@ -339,14 +356,14 @@ export const BudgetProvider = ({ children }) => {
     saveData(newConfig, monthlyData);
   };
 
-  // --- ACTIONS MENSUELLES (REVENUS / FIXES / CLOTURE) ---
+  // --- ACTIONS MENSUELLES ---
   const addIncomeLine = (monthKey) => {
     const mData = monthlyData[monthKey] || {};
     const newMData = {
       ...monthlyData,
       [monthKey]: {
         ...mData,
-        revenusList: [...(mData.revenusList || []), { id: Date.now(), label: 'Nouveau Revenu', montant: 0 }]
+        revenusList: [...(mData.revenusList || []), { id: Date.now(), label: 'Nouveau', montant: 0 }]
       }
     };
     setMonthlyData(newMData);
@@ -419,24 +436,30 @@ export const BudgetProvider = ({ children }) => {
   const validateMonth = (monthKey) => {
     const mData = monthlyData[monthKey] || {};
     if (mData.isClosed) return;
-    const newMData = { ...monthlyData, [monthKey]: { ...mData, isClosed: true } };
-    setMonthlyData(newMData);
-    saveData(config, newMData);
     
-    // Calcul mois suivant
-    let [year, month] = monthKey.split('-').map(Number);
-    month += 1;
-    if (month > 12) { month = 1; year += 1; }
-    return `${year}-${String(month).padStart(2, '0')}`;
+    let newConfig = { ...config };
+    const [year, month] = monthKey.split('-').map(Number);
+
+    // DÉCEMBRE : Reset technique des enveloppes
+    if (month === 12) {
+      newConfig.envelopes = config.envelopes.map(e => ({ ...e, currentBalance: 0 }));
+    }
+
+    const newMonthlyData = { ...monthlyData, [monthKey]: { ...mData, isClosed: true } };
+    setMonthlyData(newMonthlyData);
+    setConfig(newConfig);
+    saveData(newConfig, newMonthlyData);
+    
+    const nextMonth = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+    return nextMonth;
   };
 
   return (
     <BudgetContext.Provider value={{ 
-      user, loading, login, logout,
-      config, monthlyData, 
+      user, loading, login, logout, config, monthlyData, 
       updateConfigPoste, addConfigPoste, removeConfigPoste, updateAccountInitial, setProvisionAccount,
       addIncomeLine, updateIncomeLine, removeIncomeLine, updateFixedExpense, toggleFixedCheck,
-      validateMonth, reopenMonth,
+      validateMonth, reopenMonth, resetAllData,
       addProvisionItem, updateProvisionItem, removeProvisionItem, toggleMonthlyProvision, addProvisionExpense, removeProvisionExpense,
       updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig, fundEnvelope, spendEnvelope, removeEnvelopeExpense,
       transferToSavings, retrieveFromSavings
