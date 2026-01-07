@@ -3,9 +3,10 @@ import { BudgetProvider } from './context/BudgetContext';
 import { useBudget } from './hooks/useBudget';
 import ConfigPanel from './components/budget/ConfigPanel';
 import MonthView from './components/budget/MonthView';
-import ProvisionsView from './components/budget/AnnualView'; // ex AnnualView
-import EnvelopesConfigView from './components/budget/EnvelopesConfigView'; // <-- NOUVEAU
-import { LayoutDashboard, Settings, LogOut, Loader2, PiggyBank, Wallet } from 'lucide-react';
+import ProvisionsView from './components/budget/ProvisionsView'; 
+import EnvelopesConfigView from './components/budget/EnvelopesConfigView';
+import SavingsView from './components/budget/SavingsView'; // <-- NOUVEAU
+import { LayoutDashboard, Settings, LogOut, Loader2, PiggyBank, Wallet, ShieldCheck } from 'lucide-react'; // <-- ICONE
 
 function AppContent() {
   const { user, loading, login, logout } = useBudget();
@@ -13,7 +14,7 @@ function AppContent() {
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40}/></div>;
 
-  if (!user) { return ( <div className="h-screen flex flex-col items-center justify-center bg-slate-100"><div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full"><h1 className="text-3xl font-bold text-slate-800 mb-2">BudgetMaster 2026 🔐</h1><button onClick={login} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Se connecter avec Google</button></div></div> ); }
+  if (!user) { return (<div className="h-screen flex flex-col items-center justify-center bg-slate-100"><div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full"><h1 className="text-3xl font-bold text-slate-800 mb-2">BudgetMaster 2026 🔐</h1><button onClick={login} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Se connecter avec Google</button></div></div>); }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans">
@@ -22,8 +23,9 @@ function AppContent() {
           <div className="flex items-center gap-4 min-w-fit">{user.photoURL && <img src={user.photoURL} className="w-8 h-8 rounded-full" alt="avatar"/>}<h1 className="text-lg font-bold hidden md:block">Budget de {user.displayName}</h1></div>
           <div className="flex gap-2">
             <NavButton active={view === 'month'} onClick={() => setView('month')} icon={LayoutDashboard} label="Mensuel" />
-            <NavButton active={view === 'envelopes'} onClick={() => setView('envelopes')} icon={Wallet} label="Enveloppes" />
+            <NavButton active={view === 'envelopes'} onClick={() => setView('envelopes')} icon={Wallet} label="Env." />
             <NavButton active={view === 'provisions'} onClick={() => setView('provisions')} icon={PiggyBank} label="Provisions" />
+            <NavButton active={view === 'savings'} onClick={() => setView('savings')} icon={ShieldCheck} label="Epargne" />
             <NavButton active={view === 'config'} onClick={() => setView('config')} icon={Settings} label="Config" />
             <button onClick={logout} className="p-2 text-red-400 hover:bg-red-50 rounded-lg ml-2"><LogOut size={20}/></button>
           </div>
@@ -34,6 +36,7 @@ function AppContent() {
         {view === 'month' && <MonthView />}
         {view === 'envelopes' && <EnvelopesConfigView />}
         {view === 'provisions' && <ProvisionsView />} 
+        {view === 'savings' && <SavingsView />}
         {view === 'config' && <ConfigPanel />}
       </main>
     </div>
