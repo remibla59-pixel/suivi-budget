@@ -1,11 +1,10 @@
 import React from 'react';
 import { useBudget } from '../../hooks/useBudget';
-import { Wallet, PlusCircle, Trash2, Info, Coins } from 'lucide-react';
+import { Wallet, PlusCircle, Trash2, Info, Coins, CreditCard } from 'lucide-react';
 
 const SmartInput = ({ value, onChange, placeholder, isNumber }) => {
   const handleFocus = (e) => {
     const val = e.target.value;
-    // Efface si c'est une valeur par défaut
     if (val === '0' || (typeof val === 'string' && val.includes('Nouvelle'))) {
       onChange('');
     }
@@ -26,12 +25,12 @@ const SmartInput = ({ value, onChange, placeholder, isNumber }) => {
 };
 
 export default function EnvelopesConfigView() {
-  const { config, updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig } = useBudget();
+  const { config, updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig, updateFlexibleBudget } = useBudget();
   const envelopes = config.envelopes || [];
+  const budgetsFlexibles = config.budgetsFlexibles || [];
 
-  const renderSection = (title, category, colorClass, Icon) => {
+  const renderEnvelopeSection = (title, category, colorClass, Icon) => {
     const filteredEnvelopes = envelopes.filter(e => e.category === category);
-
     return (
       <div className={`bg-white rounded-2xl shadow-sm border overflow-hidden mb-8 ${colorClass}`}>
         <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
@@ -39,68 +38,27 @@ export default function EnvelopesConfigView() {
             <Icon size={18} className="text-slate-500" />
             <h3 className="font-bold text-slate-700 uppercase tracking-wider text-xs">{title}</h3>
           </div>
-          <button 
-            onClick={() => addEnvelopeConfig(category)} 
-            className="flex items-center gap-1 text-[10px] font-bold bg-slate-800 text-white px-3 py-1.5 rounded-lg hover:bg-black transition-all shadow-sm"
-          >
-            <PlusCircle size={14} /> Ajouter une enveloppe
-          </button>
+          <button onClick={() => addEnvelopeConfig(category)} className="flex items-center gap-1 text-[10px] font-bold bg-slate-800 text-white px-3 py-1.5 rounded-lg hover:bg-black transition-all shadow-sm"><PlusCircle size={14} /> Ajouter</button>
         </div>
-        
         <div className="divide-y divide-slate-100">
           {filteredEnvelopes.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs italic">
-              Aucune enveloppe configurée ici.
-            </div>
+            <div className="p-8 text-center text-slate-400 text-xs italic">Aucune enveloppe configurée ici.</div>
           ) : (
             filteredEnvelopes.map(env => (
               <div key={env.id} className="p-4 grid grid-cols-1 md:grid-cols-12 gap-6 items-center hover:bg-slate-50/50 transition-colors">
-                
-                {/* NOM DE L'ENVELOPPE */}
                 <div className="col-span-4">
                   <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Nom</label>
-                  <SmartInput 
-                    value={env.label} 
-                    onChange={(v) => updateEnvelopeConfig({ ...env, label: v })} 
-                    placeholder="Ex: Courses" 
-                  />
+                  <SmartInput value={env.label} onChange={(v) => updateEnvelopeConfig({ ...env, label: v })} />
                 </div>
-
-                {/* SOLDE ACTUEL (Persistant) */}
                 <div className="col-span-3">
-                   <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Solde en cours (Argent réel)</label>
-                   <div className="flex items-center gap-2">
-                     <SmartInput 
-                       isNumber 
-                       value={env.currentBalance} 
-                       onChange={(v) => updateEnvelopeConfig({ ...env, currentBalance: parseFloat(v) || 0 })} 
-                     />
-                     <span className="text-slate-400 font-bold text-sm">€</span>
-                   </div>
+                   <label className="text-[10px] text-slate-400 font-bold uppercase mb-1 block">Solde en cours</label>
+                   <div className="flex items-center gap-2"><SmartInput isNumber value={env.currentBalance} onChange={(v) => updateEnvelopeConfig({ ...env, currentBalance: parseFloat(v) || 0 })} /><span className="text-slate-400 font-bold text-sm">€</span></div>
                 </div>
-
-                {/* BUDGET MENSUEL (Montant du virement auto) */}
                 <div className="col-span-3">
-                   <label className="text-[10px] text-blue-500 font-bold uppercase mb-1 block">Virement mensuel prévu</label>
-                   <div className="flex items-center gap-2">
-                     <SmartInput 
-                       isNumber 
-                       value={env.budgetMonthly} 
-                       onChange={(v) => updateEnvelopeConfig({ ...env, budgetMonthly: parseFloat(v) || 0 })} 
-                     />
-                     <span className="text-blue-500 font-bold text-sm">€</span>
-                   </div>
+                   <label className="text-[10px] text-blue-500 font-bold uppercase mb-1 block">Virement mensuel</label>
+                   <div className="flex items-center gap-2"><SmartInput isNumber value={env.budgetMonthly} onChange={(v) => updateEnvelopeConfig({ ...env, budgetMonthly: parseFloat(v) || 0 })} /><span className="text-blue-500 font-bold text-sm">€</span></div>
                 </div>
-
-                {/* BOUTON SUPPRIMER */}
-                <div className="col-span-2 flex justify-end">
-                   <button 
-                     onClick={() => { if(confirm("Supprimer définitivement cette enveloppe ?")) removeEnvelopeConfig(env.id); }} 
-                     className="text-slate-200 hover:text-red-500 p-2 transition-colors"
-                   >
-                     <Trash2 size={20} />
-                   </button>
-                </div>
+                <div className="col-span-2 flex justify-end"><button onClick={() => { if(confirm("Supprimer ?")) removeEnvelopeConfig(env.id); }} className="text-slate-200 hover:text-red-500 p-2"><Trash2 size={20} /></button></div>
               </div>
             ))
           )}
@@ -111,38 +69,37 @@ export default function EnvelopesConfigView() {
 
   return (
     <div className="max-w-5xl mx-auto p-4 pb-20 space-y-8">
-      
-      {/* HEADER */}
       <div className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white p-8 rounded-3xl shadow-xl">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-white/20 rounded-2xl">
-            <Wallet className="text-emerald-300" size={32} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">Gestion des Enveloppes</h2>
-            <p className="text-emerald-100 text-sm opacity-80 font-medium">Configurez vos plafonds et suivez l'argent restant de mois en mois.</p>
-          </div>
+          <div className="p-3 bg-white/20 rounded-2xl"><Wallet className="text-emerald-300" size={32} /></div>
+          <div><h2 className="text-2xl font-bold">Configuration Budgets</h2><p className="text-emerald-100 text-sm opacity-80 font-medium">Définissez vos objectifs de dépenses et vos cagnottes.</p></div>
         </div>
       </div>
 
-      {/* RAPPEL DE FONCTIONNEMENT */}
-      <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 shadow-sm">
-        <Info className="text-amber-500 shrink-0" size={20} />
-        <div className="text-xs text-amber-800 leading-relaxed">
-          <strong>Comment ça marche ?</strong> <br />
-          1. Vous définissez le <strong>Virement mensuel</strong> (ex: 400€ pour les courses). <br />
-          2. Chaque début de mois, sur l'onglet Mensuel, cliquez sur <strong>"Remplir"</strong> pour ajouter ces 400€ à votre <strong>Solde Actuel</strong>. <br />
-          3. Vos dépenses sont déduites du <strong>Solde Actuel</strong>. Ce qui reste en fin de mois est conservé pour le mois suivant.
+      {/* SECTION BUDGETS FLEXIBLES (4 COLONNES) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden mb-8">
+        <div className="p-4 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+           <CreditCard size={18} className="text-blue-600"/>
+           <h3 className="font-bold text-blue-800 uppercase tracking-wider text-xs">Dépenses Courantes (Débit Direct - Objectif Mensuel)</h3>
+        </div>
+        <div className="divide-y divide-slate-100">
+           {budgetsFlexibles.map(budget => (
+             <div key={budget.id} className="p-4 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <div className="col-span-6 font-bold text-slate-700">{budget.label}</div>
+                <div className="col-span-6 flex items-center gap-2">
+                   <label className="text-xs text-slate-400 uppercase font-bold mr-2">Budget Cible :</label>
+                   <SmartInput isNumber value={budget.budget} onChange={(v) => updateFlexibleBudget(budget.id, v)} />
+                   <span className="text-slate-500 font-bold">€</span>
+                </div>
+             </div>
+           ))}
         </div>
       </div>
 
-      {/* SECTIONS CATEGORIES */}
-      {renderSection("Dépenses Courantes (4 Colonnes)", "courant", "border-emerald-100", Wallet)}
-      {renderSection("Enveloppes Secondaires / Plaisirs", "secondaire", "border-indigo-100", Coins)}
+      {renderEnvelopeSection("Enveloppes Obligatoires", "courant", "border-emerald-100", Wallet)}
+      {renderEnvelopeSection("Enveloppes Secondaires", "secondaire", "border-indigo-100", Coins)}
 
-      <div className="text-center text-[11px] text-slate-400 italic">
-        Les modifications sont enregistrées en temps réel dans votre base de données.
-      </div>
+      <div className="text-center text-[11px] text-slate-400 italic">Modifications sauvegardées automatiquement.</div>
     </div>
   );
 }
