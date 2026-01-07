@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
 import { 
   ChevronLeft, ChevronRight, Plus, Trash2, 
-  Lock, LockOpen, CheckCircle, Circle, ArrowRightLeft, 
-  DollarSign, Wallet, ShoppingBag, Coins, CreditCard 
+  Lock, CheckCircle, Circle, ArrowRightLeft, 
+  Wallet, ShoppingBag, CreditCard 
 } from 'lucide-react';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
@@ -19,11 +19,12 @@ const SmartInput = ({ value, onChange, placeholder, disabled, className, type="t
   );
 };
 
-// --- COMPOSANT : Colonne Flexible (Débit direct) ---
+// --- COMPOSANT : Colonne Flexible ---
 const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
   
+  // CALCULS
   const totalSpent = round(expenses.reduce((sum, e) => sum + e.amount, 0));
   const remaining = round(cat.budget - totalSpent);
   const isOver = remaining < 0;
@@ -42,8 +43,9 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
         <div className={`text-right font-black text-lg ${isOver ? 'text-red-500' : 'text-emerald-600'}`}>
            {isOver ? '-' : ''}{Math.abs(remaining).toLocaleString()} €
         </div>
-        <div className="text-[10px] text-right text-slate-400">
-           {isOver ? 'Dépassement' : 'Restant'}
+        <div className="flex justify-between text-[10px] mt-1 border-t border-slate-200 pt-1">
+           <span className="font-bold text-slate-500">Dépensé: {totalSpent}€</span>
+           <span className={`text-right ${isOver ? 'text-red-400' : 'text-slate-400'}`}>{isOver ? 'Dépassement' : 'Restant'}</span>
         </div>
       </div>
 
@@ -70,12 +72,10 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
   );
 };
 
-// --- COMPOSANT : Enveloppe Classique (Cagnotte) ---
+// --- COMPOSANT : Enveloppe Classique ---
 const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isClosed }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
-
-  // CALCUL DU MONTANT DE DÉPART (Solde actuel + ce qu'on a dépensé ce mois-ci)
   const spentThisMonth = round(expenses.reduce((sum, e) => sum + e.amount, 0));
   const startBalance = round(env.currentBalance + spentThisMonth);
 
@@ -86,57 +86,26 @@ const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isCl
       <div className={`p-4 border-b ${funded ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
         <div className="flex justify-between items-start mb-1">
            <span className="font-bold text-slate-800 text-sm truncate pr-2" title={env.label}>{env.label}</span>
-           {/* SOLDE ACTUEL (GROS) */}
-           <span className={`text-lg font-black ${env.currentBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-             {round(env.currentBalance).toLocaleString()}€
-           </span>
+           <span className={`text-lg font-black ${env.currentBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{round(env.currentBalance).toLocaleString()}€</span>
         </div>
-        
-        {/* SOLDE DE DÉPART (PETIT) - S'affiche uniquement s'il y a des dépenses ou si c'est rempli */}
-        <div className="flex justify-end mb-2">
-           <span className="text-[10px] font-bold text-slate-400 bg-white/50 px-1.5 rounded">
-             Départ : {startBalance.toLocaleString()}€
-           </span>
-        </div>
-
-        {/* LOGIQUE D'AFFICHAGE DU BOUTON / BADGE */}
+        <div className="flex justify-end mb-2"><span className="text-[10px] font-bold text-slate-400 bg-white/50 px-1.5 rounded">Départ : {startBalance.toLocaleString()}€</span></div>
         {funded ? (
-          <div className="text-[10px] text-center text-emerald-600 font-bold bg-emerald-100/50 rounded-lg py-1 border border-emerald-200/50">
-             Budget versé
-          </div>
+          <div className="text-[10px] text-center text-emerald-600 font-bold bg-emerald-100/50 rounded-lg py-1 border border-emerald-200/50">Budget versé</div>
         ) : !isClosed ? (
-          <button 
-            onClick={() => onFund(env.id)} 
-            className="w-full text-[10px] uppercase font-black bg-white border border-emerald-200 text-emerald-600 py-2 rounded-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-1"
-          >
-             <Plus size={12}/> Remplir ({env.budgetMonthly}€)
-          </button>
+          <button onClick={() => onFund(env.id)} className="w-full text-[10px] uppercase font-black bg-white border border-emerald-200 text-emerald-600 py-2 rounded-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-1"><Plus size={12}/> Remplir ({env.budgetMonthly}€)</button>
         ) : (
-          <div className="text-[10px] text-center text-slate-400 font-bold bg-slate-100 rounded-lg py-1 border border-slate-200">
-             Non versé
-          </div>
+          <div className="text-[10px] text-center text-slate-400 font-bold bg-slate-100 rounded-lg py-1 border border-slate-200">Non versé</div>
         )}
       </div>
-
       <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-60 bg-slate-50/30 min-h-[100px]">
         {expenses.length === 0 && <div className="text-center text-[10px] text-slate-300 py-8 italic opacity-60">Aucune dépense</div>}
         {expenses.map(e => (
           <div key={e.id} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm text-[11px] group">
-            <div className="flex justify-between items-start">
-              <span className="font-bold text-slate-700 leading-tight">{e.label}</span>
-              <span className="font-black text-slate-900 ml-2">{round(e.amount)}€</span>
-            </div>
-            {!isClosed && (
-              <div className="text-right mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onRemove(e.id, env.id, e.amount)} className="text-slate-300 hover:text-red-500 transition-colors">
-                  <Trash2 size={12}/>
-                </button>
-              </div>
-            )}
+            <div className="flex justify-between items-start"><span className="font-bold text-slate-700 leading-tight">{e.label}</span><span className="font-black text-slate-900 ml-2">{round(e.amount)}€</span></div>
+            {!isClosed && <div className="text-right mt-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onRemove(e.id, env.id, e.amount)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={12}/></button></div>}
           </div>
         ))}
       </div>
-      
       {!isClosed && (
         <div className="p-3 border-t border-slate-100 bg-white">
            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none mb-2 focus:border-blue-400 bg-transparent"/>
@@ -156,10 +125,10 @@ export default function MonthView() {
     config, monthlyData, addIncomeLine, updateIncomeLine, removeIncomeLine, 
     updateFixedExpense, toggleFixedCheck, fundEnvelope, spendEnvelope, removeEnvelopeExpense, 
     toggleMonthlyProvision, addProvisionExpense, removeProvisionExpense, validateMonth, reopenMonth,
-    addFlexibleExpense, removeFlexibleExpense 
+    addFlexibleExpense, removeFlexibleExpense,
+    currentMonth, setCurrentMonth // Récupération depuis Context
   } = useBudget();
 
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
   const mData = monthlyData[currentMonth] || {};
   const isClosed = mData.isClosed;
   const currentYear = currentMonth.split('-')[0];
@@ -170,14 +139,11 @@ export default function MonthView() {
   const totalAnnualProvisions = round(provisionsOfYear.reduce((sum, p) => sum + (p.amount || 0), 0));
   const monthlyProvisionAmount = Math.round(totalAnnualProvisions / 12);
   const isProvisionDone = mData.provisionDone || false;
-
   const totalFixe = round(config.postes.filter(p => p.type === 'fixe').reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
   const totalEpargne = round(config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0));
-  
-  // Enveloppes strictes (Cagnottes)
   const fundedEnvelopesAmount = config.envelopes.reduce((sum, env) => sum + (mData[`funded_${env.id}`] ? env.budgetMonthly : 0), 0);
   
-  // Dépenses Flexibles (Direct Courant)
+  // Dépenses Flexibles
   const flexibleExpenses = mData.flexibleExpenses || [];
   const totalFlexibleSpent = round(flexibleExpenses.reduce((sum, e) => sum + e.amount, 0));
 
@@ -230,7 +196,9 @@ export default function MonthView() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center text-center">
           <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Sorties Compte Courant</label>
           <div className="text-4xl font-black text-slate-900">{totalSorties.toLocaleString()} €</div>
-          <div className="text-[10px] text-slate-400 mt-2 font-bold italic bg-slate-50 rounded-full py-1 px-3 inline-block mx-auto">Tout inclus (Direct + Enveloppes)</div>
+          <div className="text-[10px] text-slate-400 mt-2 font-bold italic bg-slate-50 rounded-full py-1 px-3 inline-block mx-auto">
+            Dont Dépenses Courantes : {totalFlexibleSpent.toLocaleString()}€
+          </div>
         </div>
         <div className={`p-6 rounded-3xl shadow-sm flex flex-col justify-center text-center border-2 ${resteAVivre >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
           <label className={`text-[10px] font-black uppercase tracking-widest mb-2 ${resteAVivre >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>Reste sur Compte</label>
@@ -240,9 +208,14 @@ export default function MonthView() {
 
       {/* 1. DEPENSES COURANTES (4 COLONNES FLEXIBLES) */}
       <section>
-        <h3 className="font-black text-slate-800 flex items-center gap-2 mt-8 text-lg mb-4">
-          <CreditCard size={20} className="text-blue-500"/> Dépenses Courantes (Débit Direct)
-        </h3>
+        <div className="flex items-center justify-between mt-8 mb-4 px-2">
+           <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg">
+             <CreditCard size={20} className="text-blue-500"/> Dépenses Courantes
+           </h3>
+           <div className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+             Total Dépensé : {totalFlexibleSpent.toLocaleString()}€
+           </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {(config.budgetsFlexibles || []).map(cat => (
             <FlexibleBudgetColumn 
@@ -301,7 +274,7 @@ export default function MonthView() {
              {!isClosed && (
                <div className="flex flex-col gap-3 mt-5">
                  <select value={selectedProvId} onChange={(e) => setSelectedProvId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"><option value="">-- Choisir la charge --</option>{provisionsOfYear.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}</select>
-                 <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black transition-colors shadow-lg shadow-orange-100 disabled:opacity-50"><DollarSign size={20} /></button></div>
+                 <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black shadow-lg shadow-orange-100"><DollarSign size={20} /></button></div>
                </div>
              )}
           </div>

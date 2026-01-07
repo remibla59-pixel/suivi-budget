@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
 import { Target, Plus, Trash2, TrendingUp, PiggyBank, Coins } from 'lucide-react';
 
-// CARTE PROJET INDIVIDUELLE
 const ProjectCard = ({ project, onFund, onRemove }) => {
   const [fundAmount, setFundAmount] = useState('');
-  const progress = Math.min((project.current / project.target) * 100, 100);
+  const [targetAccount, setTargetAccount] = useState('ldd'); // Par défaut
+  
+  // Calculs : current est la somme des allocations
+  const currentTotal = (project.allocations?.ldd || 0) + (project.allocations?.casden || 0);
+  const progress = Math.min((currentTotal / project.target) * 100, 100);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
@@ -13,42 +16,61 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
         <div className="flex justify-between items-start mb-4">
            <div>
              <h3 className="font-black text-lg text-slate-800 leading-tight">{project.label}</h3>
-             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded mt-1 inline-block ${project.accountId === 'ldd' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
-               Sur {project.accountId === 'ldd' ? 'LDD Véro' : 'CASDEN'}
-             </span>
            </div>
            <button onClick={() => {if(confirm("Supprimer ce projet ?")) onRemove(project.id)}} className="text-slate-300 hover:text-red-500 transition-colors">
              <Trash2 size={18}/>
            </button>
         </div>
 
+        {/* Jauges et Totaux */}
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1 font-medium">
-            <span className="font-black text-emerald-600">{Math.round(project.current).toLocaleString()} €</span>
+            <span className="font-black text-emerald-600">{Math.round(currentTotal).toLocaleString()} €</span>
             <span className="text-slate-400">Objectif : {project.target.toLocaleString()} €</span>
           </div>
-          <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-3">
             <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 shadow-sm" style={{ width: `${progress}%` }}></div>
+          </div>
+          
+          {/* Détail répartition */}
+          <div className="flex gap-2 text-[10px]">
+            <span className="bg-purple-50 text-purple-600 px-2 py-1 rounded font-bold border border-purple-100">
+               LDD : {(project.allocations?.ldd || 0).toLocaleString()}€
+            </span>
+            <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold border border-blue-100">
+               CASDEN : {(project.allocations?.casden || 0).toLocaleString()}€
+            </span>
           </div>
         </div>
 
+        {/* Zone financement */}
         <div className="bg-slate-50 p-3 rounded-xl">
            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Ajouter de l'argent (Depuis Courant)</label>
-           <div className="flex gap-2">
-             <input 
-               type="number" 
-               placeholder="Montant" 
-               value={fundAmount} 
-               onChange={e => setFundAmount(e.target.value)}
-               className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-400 bg-white font-bold"
-             />
-             <button 
-               onClick={() => { if(fundAmount) { onFund(project.id, fundAmount); setFundAmount(''); }}}
-               disabled={!fundAmount}
-               className="bg-slate-900 text-white px-3 rounded-lg hover:bg-black disabled:opacity-50 transition-colors"
+           <div className="flex flex-col gap-2">
+             <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  placeholder="Montant" 
+                  value={fundAmount} 
+                  onChange={e => setFundAmount(e.target.value)}
+                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-400 bg-white font-bold"
+                />
+                <button 
+                  onClick={() => { if(fundAmount) { onFund(project.id, fundAmount, targetAccount); setFundAmount(''); }}}
+                  disabled={!fundAmount}
+                  className="bg-slate-900 text-white px-3 rounded-lg hover:bg-black disabled:opacity-50 transition-colors"
+                >
+                  <Plus size={18}/>
+                </button>
+             </div>
+             <select 
+               value={targetAccount} 
+               onChange={(e) => setTargetAccount(e.target.value)}
+               className="w-full p-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none font-bold text-slate-600"
              >
-               <Plus size={18}/>
-             </button>
+               <option value="ldd">Vers LDD Véro</option>
+               <option value="casden">Vers Compte CASDEN</option>
+             </select>
            </div>
         </div>
       </div>
@@ -63,22 +85,27 @@ export default function ProjectsView() {
   // State formulaire nouveau projet
   const [newLabel, setNewLabel] = useState('');
   const [newTarget, setNewTarget] = useState('');
-  const [newInitial, setNewInitial] = useState(''); // <-- NOUVEAU CHAMP
-  const [newAccount, setNewAccount] = useState('ldd');
+  const [initLDD, setInitLDD] = useState('');    // Allocation initiale LDD
+  const [initCasden, setInitCasden] = useState(''); // Allocation initiale CASDEN
 
   const handleCreate = () => {
     if(newLabel && newTarget) {
-      addProject(newLabel, newTarget, newAccount, newInitial);
-      setNewLabel(''); setNewTarget(''); setNewInitial(''); setIsCreating(false);
+      const allocations = {
+        ldd: parseFloat(initLDD) || 0,
+        casden: parseFloat(initCasden) || 0
+      };
+      addProject(newLabel, newTarget, allocations);
+      setNewLabel(''); setNewTarget(''); setInitLDD(''); setInitCasden(''); setIsCreating(false);
     }
   };
 
-  // Calculs totaux
+  // Calculs totaux globaux (Physiques)
   const totalLDD = config.comptes.find(c=>c.id==='ldd')?.initial || 0;
   const totalCasden = config.comptes.find(c=>c.id==='casden')?.initial || 0;
   
-  const assignedLDD = (config.projects || []).filter(p=>p.accountId==='ldd').reduce((sum, p)=>sum+p.current, 0);
-  const assignedCasden = (config.projects || []).filter(p=>p.accountId==='casden').reduce((sum, p)=>sum+p.current, 0);
+  // Calculs argent déjà assigné
+  const assignedLDD = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.ldd || 0), 0);
+  const assignedCasden = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.casden || 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto p-4 pb-20 space-y-8">
@@ -90,7 +117,7 @@ export default function ProjectsView() {
             <Target className="text-pink-400" size={32} /> 
             Grands Projets
           </h2>
-          <p className="text-indigo-200 text-sm mt-1 font-medium">Épargne ciblée sur LDD & CASDEN</p>
+          <p className="text-indigo-200 text-sm mt-1 font-medium">Épargne ciblée multi-comptes</p>
         </div>
         <button 
           onClick={() => setIsCreating(true)} 
@@ -120,22 +147,19 @@ export default function ProjectsView() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase ml-1">Compte support</label>
-                <select value={newAccount} onChange={e=>setNewAccount(e.target.value)} className="w-full p-3 border rounded-xl outline-none bg-white font-bold cursor-pointer">
-                  <option value="ldd">LDD Véro (Solde: {Math.round(totalLDD)}€)</option>
-                  <option value="casden">Compte CASDEN (Solde: {Math.round(totalCasden)}€)</option>
-                </select>
+            <div className="space-y-4 bg-slate-50 p-4 rounded-xl">
+              <label className="text-xs font-black text-slate-500 uppercase">Allocations Initiales (Déjà épargné)</label>
+              <div className="flex items-center gap-2">
+                 <div className="w-24 text-xs font-bold text-purple-600">Sur LDD :</div>
+                 <input type="number" value={initLDD} onChange={e=>setInitLDD(e.target.value)} placeholder="0" className="flex-1 p-2 border rounded-lg text-right font-bold" />
+                 <span className="text-xs font-bold text-slate-400">€</span>
               </div>
-              <div>
-                 <label className="text-xs font-bold text-emerald-600 uppercase ml-1">Déjà épargné (Allocation initiale)</label>
-                 <div className="flex items-center border border-emerald-200 rounded-xl px-3 bg-emerald-50 focus-within:border-emerald-500">
-                   <input type="number" value={newInitial} onChange={e=>setNewInitial(e.target.value)} placeholder="0" className="w-full p-3 outline-none bg-transparent font-bold text-emerald-800" />
-                   <span className="text-emerald-600 font-bold">€</span>
-                 </div>
-                 <p className="text-[10px] text-slate-400 mt-1 italic">Ce montant sera attribué au projet depuis le solde existant, sans débit du compte courant.</p>
+              <div className="flex items-center gap-2">
+                 <div className="w-24 text-xs font-bold text-blue-600">Sur CASDEN :</div>
+                 <input type="number" value={initCasden} onChange={e=>setInitCasden(e.target.value)} placeholder="0" className="flex-1 p-2 border rounded-lg text-right font-bold" />
+                 <span className="text-xs font-bold text-slate-400">€</span>
               </div>
+              <p className="text-[10px] text-slate-400 italic text-center">Ces montants seront réservés sur vos comptes sans virement.</p>
             </div>
           </div>
 
@@ -159,7 +183,7 @@ export default function ProjectsView() {
                  </div>
               </div>
               <div className="text-right">
-                <span className="block text-xs font-bold uppercase text-purple-400">Non affecté</span>
+                <span className="block text-xs font-bold uppercase text-purple-400">Disponible</span>
                 <span className="font-black text-xl text-purple-700">{(totalLDD - assignedLDD).toLocaleString()} €</span>
               </div>
             </div>
@@ -167,8 +191,7 @@ export default function ProjectsView() {
                <div className="h-full bg-purple-500" style={{ width: `${Math.min((assignedLDD/totalLDD)*100, 100)}%` }}></div>
             </div>
             <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-1">
-               <span>Affecté aux projets: {assignedLDD.toLocaleString()} €</span>
-               <span>Total: {Math.round(totalLDD).toLocaleString()} €</span>
+               <span>Affecté projets: {assignedLDD.toLocaleString()} €</span>
             </div>
          </div>
 
@@ -183,7 +206,7 @@ export default function ProjectsView() {
                  </div>
               </div>
               <div className="text-right">
-                <span className="block text-xs font-bold uppercase text-blue-400">Non affecté</span>
+                <span className="block text-xs font-bold uppercase text-blue-400">Disponible</span>
                 <span className="font-black text-xl text-blue-700">{(totalCasden - assignedCasden).toLocaleString()} €</span>
               </div>
             </div>
@@ -191,8 +214,7 @@ export default function ProjectsView() {
                <div className="h-full bg-blue-500" style={{ width: `${Math.min((assignedCasden/totalCasden)*100, 100)}%` }}></div>
             </div>
             <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-1">
-               <span>Affecté aux projets: {assignedCasden.toLocaleString()} €</span>
-               <span>Total: {Math.round(totalCasden).toLocaleString()} €</span>
+               <span>Affecté projets: {assignedCasden.toLocaleString()} €</span>
             </div>
          </div>
       </div>
