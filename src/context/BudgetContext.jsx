@@ -37,8 +37,6 @@ export const BudgetProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [monthlyData, setMonthlyData] = useState({});
-  
-  // Persistance de l'onglet mois
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
 
   // --- AUTH & SYNC ---
@@ -50,45 +48,88 @@ export const BudgetProvider = ({ children }) => {
 
   // --- HELPER COMPTES ---
   const updateAccountInitial = (id, v) => { const n={...config, comptes:config.comptes.map(c=>c.id===id?{...c, initial:parseFloat(v)||0}:c)}; setConfig(n); saveData(n, monthlyData); };
+  const updateAnalysisData = (mk, f, v) => { const m=monthlyData[mk]||{}; const nM={...monthlyData,[mk]:{...m,[f]:f.includes('note')?v:(parseFloat(v)||0)}}; setMonthlyData(nM); saveData(config, nM); };
 
-  // --- NOUVEAU : SAUVEGARDE DONNÉES ANALYSE (Allocation surplus + Notes) ---
-  const updateAnalysisData = (monthKey, field, value) => {
-    const mData = monthlyData[monthKey] || {};
-    const newMData = {
-      ...monthlyData,
-      [monthKey]: {
-        ...mData,
-        [field]: field.includes('note') ? value : (parseFloat(value) || 0)
-      }
-    };
-    setMonthlyData(newMData);
-    saveData(config, newMData);
-  };
-
-  // --- GESTION PROJETS ---
+  // --- GESTION PROJETS (AVEC VIREMENT REEL ET HISTORIQUE MENSUEL) ---
   const addProject = (label, target, allocations) => {
     const newProject = { id: Date.now().toString(), label, target: parseFloat(target), allocations };
     const n = { ...config, projects: [...(config.projects || []), newProject] };
     setConfig(n); saveData(n, monthlyData);
   };
   const removeProject = (id) => { const n = { ...config, projects: (config.projects || []).filter(p => p.id !== id) }; setConfig(n); saveData(n, monthlyData); };
-  const fundProject = (projectId, amount, targetAccountId) => {
+
+  // MISE A JOUR MAJEURE : On passe monthKey pour enregistrer la transaction ce mois-ci
+  const fundProject = (projectId, amount, targetAccountId, monthKey) => {
     const val = parseFloat(amount) || 0;
     const project = (config.projects || []).find(p => p.id === projectId);
     if (!project) return;
+    
+    // 1. Mouvement Bancaire (Courant -> Cible)
     const updatedComptes = config.comptes.map(c => {
       if (c.type === 'courant') return { ...c, initial: c.initial - val };
       if (c.id === targetAccountId) return { ...c, initial: c.initial + val };
       return c;
     });
+
+    // 2. Mise à jour du Projet (Allocations)
     const currentAllocation = project.allocations[targetAccountId] || 0;
     const updatedAllocations = { ...project.allocations, [targetAccountId]: currentAllocation + val };
     const updatedProjects = config.projects.map(p => p.id === projectId ? { ...p, allocations: updatedAllocations } : p);
+
+    // 3. Enregistrement de la transaction dans le mois (pour le tableau annuel)
+    // Si monthKey n'est pas fourni (appel depuis ProjectsView), on utilise currentMonth
+    const targetMonth = monthKey || currentMonth;
+    const mData = monthlyData[targetMonth] || {};
+    const transaction = { id: Date.now(), type: 'project', projectId, amount: val, targetAccountId };
+    const newMData = {
+        ...monthlyData,
+        [targetMonth]: {
+            ...mData,
+            allocationsList: [...(mData.allocationsList || []), transaction]
+        }
+    };
+
     const n = { ...config, comptes: updatedComptes, projects: updatedProjects };
-    setConfig(n); saveData(n, monthlyData);
+    setConfig(n); 
+    setMonthlyData(newMData);
+    saveData(n, newMData);
   };
 
-  // --- BUDGETS FLEXIBLES ---
+  // --- EPARGNE PRECAUTION (AVEC VIREMENT REEL ET HISTORIQUE) ---
+  const transferToSavings = (amount, note, monthKey) => {
+    const val = parseFloat(amount) || 0;
+    
+    // 1. Mouvement Bancaire
+    const updatedComptes = config.comptes.map(c => {
+      if (c.type === 'courant') return { ...c, initial: c.initial - val };
+      if (c.id === config.savingsAccountId) return { ...c, initial: c.initial + val };
+      return c;
+    });
+
+    // 2. Historique Global
+    const historyItem = { id: Date.now(), date: new Date().toLocaleDateString(), type: 'depot', amount: val, note: note || 'Virement' };
+    
+    // 3. Enregistrement transaction mois (pour tableau annuel)
+    const targetMonth = monthKey || currentMonth;
+    const mData = monthlyData[targetMonth] || {};
+    const transaction = { id: Date.now(), type: 'savings', amount: val, note };
+    const newMData = {
+        ...monthlyData,
+        [targetMonth]: {
+            ...mData,
+            allocationsList: [...(mData.allocationsList || []), transaction]
+        }
+    };
+
+    const nc = { ...config, comptes: updatedComptes, savingsHistory: [historyItem, ...(config.savingsHistory || [])].slice(0, 50) };
+    setConfig(nc);
+    setMonthlyData(newMData);
+    saveData(nc, newMData);
+  };
+
+  const retrieveFromSavings=(a,n)=>{const v=parseFloat(a)||0;const uC=config.comptes.map(c=>{if(c.type==='courant')return{...c,initial:c.initial+v};if(c.id===config.savingsAccountId)return{...c,initial:c.initial-v};return c;});const h={id:Date.now(),date:new Date().toLocaleDateString(),type:'retrait',amount:v,note:n||'Retrait'};const nc={...config,comptes:uC,savingsHistory:[h,...(config.savingsHistory||[])].slice(0,50)};setConfig(nc);saveData(nc,monthlyData);};
+
+  // --- RESTE INCHANGÉ ---
   const updateFlexibleBudget = (id, newBudget) => { const n = { ...config, budgetsFlexibles: config.budgetsFlexibles.map(b => b.id === id ? { ...b, budget: parseFloat(newBudget) || 0 } : b) }; setConfig(n); saveData(n, monthlyData); };
   const addFlexibleExpense = (monthKey, catId, label, amount) => {
     const mData = monthlyData[monthKey] || {};
@@ -109,10 +150,7 @@ export const BudgetProvider = ({ children }) => {
     const newConfig = { ...config, comptes: updatedComptes };
     setConfig(newConfig); setMonthlyData(newMData); saveData(newConfig, newMData);
   };
-
-  // --- FONCTIONS EXISTANTES ---
-  const transferToSavings=(a,n)=>{const v=parseFloat(a)||0;const uC=config.comptes.map(c=>{if(c.type==='courant')return{...c,initial:c.initial-v};if(c.id===config.savingsAccountId)return{...c,initial:c.initial+v};return c;});const h={id:Date.now(),date:new Date().toLocaleDateString(),type:'depot',amount:v,note:n||'Virement'};const nc={...config,comptes:uC,savingsHistory:[h,...(config.savingsHistory||[])].slice(0,50)};setConfig(nc);saveData(nc,monthlyData);};
-  const retrieveFromSavings=(a,n)=>{const v=parseFloat(a)||0;const uC=config.comptes.map(c=>{if(c.type==='courant')return{...c,initial:c.initial+v};if(c.id===config.savingsAccountId)return{...c,initial:c.initial-v};return c;});const h={id:Date.now(),date:new Date().toLocaleDateString(),type:'retrait',amount:v,note:n||'Retrait'};const nc={...config,comptes:uC,savingsHistory:[h,...(config.savingsHistory||[])].slice(0,50)};setConfig(nc);saveData(nc,monthlyData);};
+  
   const updateConfigPoste = (p) => { const n={...config, postes:config.postes.map(x=>x.id===p.id?p:x)}; setConfig(n); saveData(n, monthlyData); };
   const addConfigPoste = (t) => { const n={...config, postes:[...config.postes, {id:Date.now().toString(), label:'Nouveau', type:t, montant:0}]}; setConfig(n); saveData(n, monthlyData); };
   const removeConfigPoste = (id) => { const n={...config, postes:config.postes.filter(x=>x.id!==id)}; setConfig(n); saveData(n, monthlyData); };
@@ -158,7 +196,6 @@ export const BudgetProvider = ({ children }) => {
       transferToSavings, retrieveFromSavings,
       addProject, removeProject, fundProject,
       updateFlexibleBudget, addFlexibleExpense, removeFlexibleExpense,
-      // NOUVEAU
       updateAnalysisData
     }}>
       {children}
