@@ -19,7 +19,7 @@ const SmartInput = ({ value, onChange, placeholder, disabled, className, type="t
   );
 };
 
-// NOUVEAU COMPOSANT : Colonne Flexible (Débit direct)
+// --- COMPOSANT : Colonne Flexible (Débit direct) ---
 const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
@@ -32,7 +32,6 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow">
-      {/* Header : Budget indicatif */}
       <div className="p-4 border-b border-slate-100 bg-slate-50">
         <div className="flex justify-between items-start mb-1">
            <span className="font-bold text-slate-800 text-sm">{cat.label}</span>
@@ -48,7 +47,6 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
         </div>
       </div>
 
-      {/* Liste des dépenses */}
       <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-60 bg-slate-50/30 min-h-[100px]">
         {expenses.length === 0 && <div className="text-center text-[10px] text-slate-300 py-8 italic opacity-60">Aucune dépense</div>}
         {expenses.map(e => (
@@ -59,7 +57,6 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
         ))}
       </div>
 
-      {/* Ajout Dépense */}
       {!isClosed && (
         <div className="p-3 border-t border-slate-100 bg-white">
            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none mb-2 focus:border-blue-400 bg-transparent"/>
@@ -73,34 +70,73 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
   );
 };
 
-// COMPOSANT : Enveloppe Classique (Cagnotte)
+// --- COMPOSANT : Enveloppe Classique (Cagnotte) ---
 const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isClosed }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
+
+  // CALCUL DU MONTANT DE DÉPART (Solde actuel + ce qu'on a dépensé ce mois-ci)
+  const spentThisMonth = round(expenses.reduce((sum, e) => sum + e.amount, 0));
+  const startBalance = round(env.currentBalance + spentThisMonth);
+
   const handleSpend = () => { if (note && amount) { onSpend(env.id, note, amount); setNote(''); setAmount(''); } };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow">
       <div className={`p-4 border-b ${funded ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex justify-between items-start mb-1">
            <span className="font-bold text-slate-800 text-sm truncate pr-2" title={env.label}>{env.label}</span>
-           <span className={`text-lg font-black ${env.currentBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{round(env.currentBalance)}€</span>
+           {/* SOLDE ACTUEL (GROS) */}
+           <span className={`text-lg font-black ${env.currentBalance < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+             {round(env.currentBalance).toLocaleString()}€
+           </span>
         </div>
-        {!funded && !isClosed ? (
-          <button onClick={() => onFund(env.id)} className="w-full text-[10px] uppercase font-black bg-white border border-emerald-200 text-emerald-600 py-2 rounded-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-1"><Plus size={12}/> Remplir ({env.budgetMonthly}€)</button>
+        
+        {/* SOLDE DE DÉPART (PETIT) - S'affiche uniquement s'il y a des dépenses ou si c'est rempli */}
+        <div className="flex justify-end mb-2">
+           <span className="text-[10px] font-bold text-slate-400 bg-white/50 px-1.5 rounded">
+             Départ : {startBalance.toLocaleString()}€
+           </span>
+        </div>
+
+        {/* LOGIQUE D'AFFICHAGE DU BOUTON / BADGE */}
+        {funded ? (
+          <div className="text-[10px] text-center text-emerald-600 font-bold bg-emerald-100/50 rounded-lg py-1 border border-emerald-200/50">
+             Budget versé
+          </div>
+        ) : !isClosed ? (
+          <button 
+            onClick={() => onFund(env.id)} 
+            className="w-full text-[10px] uppercase font-black bg-white border border-emerald-200 text-emerald-600 py-2 rounded-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-1"
+          >
+             <Plus size={12}/> Remplir ({env.budgetMonthly}€)
+          </button>
         ) : (
-          <div className="text-[10px] text-center text-emerald-600 font-bold bg-emerald-100/50 rounded-lg py-1 border border-emerald-200/50">Budget versé</div>
+          <div className="text-[10px] text-center text-slate-400 font-bold bg-slate-100 rounded-lg py-1 border border-slate-200">
+             Non versé
+          </div>
         )}
       </div>
+
       <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-60 bg-slate-50/30 min-h-[100px]">
         {expenses.length === 0 && <div className="text-center text-[10px] text-slate-300 py-8 italic opacity-60">Aucune dépense</div>}
         {expenses.map(e => (
           <div key={e.id} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm text-[11px] group">
-            <div className="flex justify-between items-start"><span className="font-bold text-slate-700 leading-tight">{e.label}</span><span className="font-black text-slate-900 ml-2">{round(e.amount)}€</span></div>
-            {!isClosed && <div className="text-right mt-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onRemove(e.id, env.id, e.amount)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={12}/></button></div>}
+            <div className="flex justify-between items-start">
+              <span className="font-bold text-slate-700 leading-tight">{e.label}</span>
+              <span className="font-black text-slate-900 ml-2">{round(e.amount)}€</span>
+            </div>
+            {!isClosed && (
+              <div className="text-right mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => onRemove(e.id, env.id, e.amount)} className="text-slate-300 hover:text-red-500 transition-colors">
+                  <Trash2 size={12}/>
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
+      
       {!isClosed && (
         <div className="p-3 border-t border-slate-100 bg-white">
            <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none mb-2 focus:border-blue-400 bg-transparent"/>
@@ -114,6 +150,7 @@ const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isCl
   );
 };
 
+// --- VUE PRINCIPALE ---
 export default function MonthView() {
   const { 
     config, monthlyData, addIncomeLine, updateIncomeLine, removeIncomeLine, 
@@ -212,7 +249,6 @@ export default function MonthView() {
               key={cat.id} 
               cat={cat} 
               expenses={flexibleExpenses.filter(e => e.catId === cat.id)} 
-              onSpend={spendEnvelope.bind(null, currentMonth)} // Réutilisation logique mais appel dédié wrapper
               onSpend={(id, note, amount) => addFlexibleExpense(currentMonth, id, note, amount)}
               onRemove={(id, amount) => removeFlexibleExpense(currentMonth, id, amount)}
               isClosed={isClosed} 
@@ -229,7 +265,7 @@ export default function MonthView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {config.envelopes.filter(e => e.category === 'courant').length === 0 ? (
             <div className="col-span-full p-4 text-center text-slate-400 text-sm italic bg-slate-50 rounded-xl border border-dashed border-slate-200">
-              Aucune enveloppe obligatoire configurée. (Utilisez les 4 colonnes ci-dessus pour les courses).
+              Aucune enveloppe obligatoire configurée.
             </div>
           ) : (
             config.envelopes.filter(e => e.category === 'courant').map(env => (
@@ -265,7 +301,7 @@ export default function MonthView() {
              {!isClosed && (
                <div className="flex flex-col gap-3 mt-5">
                  <select value={selectedProvId} onChange={(e) => setSelectedProvId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"><option value="">-- Choisir la charge --</option>{provisionsOfYear.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}</select>
-                 <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black shadow-lg shadow-orange-100"><DollarSign size={20} /></button></div>
+                 <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black transition-colors shadow-lg shadow-orange-100 disabled:opacity-50"><DollarSign size={20} /></button></div>
                </div>
              )}
           </div>
@@ -280,7 +316,7 @@ export default function MonthView() {
             const isChecked = mData.fixedStatus?.[p.id] || false;
             return (
               <div key={p.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-50'}`}>
-                <div className="flex items-center gap-4"><button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-transform active:scale-90 ${isChecked ? 'text-emerald-500' : 'text-slate-200'}`}>{isChecked ? <CheckCircle size={30} fill="currentColor" className="text-white" /> : <Circle size={30} />}</button><span className={`text-sm font-bold ${isChecked ? 'text-emerald-800' : 'text-slate-700'}`}>{p.label}</span></div>
+                <div className="flex items-center gap-4"><button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-transform active:scale-90 ${isChecked ? 'text-emerald-500' : 'text-slate-200 hover:text-slate-400'}`}>{isChecked ? <CheckCircle size={30} fill="currentColor" className="text-white" /> : <Circle size={30} />}</button><span className={`text-sm font-bold ${isChecked ? 'text-emerald-800' : 'text-slate-700'}`}>{p.label}</span></div>
                 <div className="flex items-center gap-2"><SmartInput type="number" disabled={isClosed} value={mData.depenses?.[p.id] ?? p.montant} onChange={(v) => updateFixedExpense(currentMonth, p.id, v)} className={`w-24 text-right p-1.5 bg-transparent border-b outline-none font-black text-lg ${isChecked ? 'text-emerald-700 border-emerald-200' : 'text-slate-800 border-slate-200'}`} /><span className="text-[10px] font-black text-slate-300">€</span></div>
               </div>
             );
