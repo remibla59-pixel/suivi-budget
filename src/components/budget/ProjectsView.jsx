@@ -4,9 +4,9 @@ import { Target, Plus, Trash2, TrendingUp, PiggyBank, Coins } from 'lucide-react
 
 const ProjectCard = ({ project, onFund, onRemove }) => {
   const [fundAmount, setFundAmount] = useState('');
-  const [targetAccount, setTargetAccount] = useState('ldd'); // Par défaut
+  const [targetAccount, setTargetAccount] = useState('ldd'); 
   
-  // Calculs : current est la somme des allocations
+  // SECURE : On utilise l'opérateur ?. pour éviter le crash si allocations est undefined
   const currentTotal = (project.allocations?.ldd || 0) + (project.allocations?.casden || 0);
   const progress = Math.min((currentTotal / project.target) * 100, 100);
 
@@ -22,7 +22,6 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
            </button>
         </div>
 
-        {/* Jauges et Totaux */}
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-1 font-medium">
             <span className="font-black text-emerald-600">{Math.round(currentTotal).toLocaleString()} €</span>
@@ -32,7 +31,6 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
             <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 shadow-sm" style={{ width: `${progress}%` }}></div>
           </div>
           
-          {/* Détail répartition */}
           <div className="flex gap-2 text-[10px]">
             <span className="bg-purple-50 text-purple-600 px-2 py-1 rounded font-bold border border-purple-100">
                LDD : {(project.allocations?.ldd || 0).toLocaleString()}€
@@ -43,7 +41,6 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
           </div>
         </div>
 
-        {/* Zone financement */}
         <div className="bg-slate-50 p-3 rounded-xl">
            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Ajouter de l'argent (Depuis Courant)</label>
            <div className="flex flex-col gap-2">
@@ -82,11 +79,10 @@ export default function ProjectsView() {
   const { config, addProject, removeProject, fundProject } = useBudget();
   const [isCreating, setIsCreating] = useState(false);
   
-  // State formulaire nouveau projet
   const [newLabel, setNewLabel] = useState('');
   const [newTarget, setNewTarget] = useState('');
-  const [initLDD, setInitLDD] = useState('');    // Allocation initiale LDD
-  const [initCasden, setInitCasden] = useState(''); // Allocation initiale CASDEN
+  const [initLDD, setInitLDD] = useState('');    
+  const [initCasden, setInitCasden] = useState('');
 
   const handleCreate = () => {
     if(newLabel && newTarget) {
@@ -99,18 +95,15 @@ export default function ProjectsView() {
     }
   };
 
-  // Calculs totaux globaux (Physiques)
   const totalLDD = config.comptes.find(c=>c.id==='ldd')?.initial || 0;
   const totalCasden = config.comptes.find(c=>c.id==='casden')?.initial || 0;
   
-  // Calculs argent déjà assigné
   const assignedLDD = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.ldd || 0), 0);
   const assignedCasden = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.casden || 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto p-4 pb-20 space-y-8">
       
-      {/* HEADER */}
       <div className="bg-gradient-to-r from-indigo-900 to-purple-800 text-white p-8 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
           <h2 className="text-3xl font-black flex items-center gap-3">
@@ -127,7 +120,6 @@ export default function ProjectsView() {
         </button>
       </div>
 
-      {/* FORMULAIRE DE CREATION */}
       {isCreating && (
         <div className="bg-white p-6 rounded-3xl shadow-xl border border-indigo-100 animate-in fade-in slide-in-from-top-4">
           <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2"><Target size={20}/> Définir un nouvel objectif</h3>
@@ -170,9 +162,7 @@ export default function ProjectsView() {
         </div>
       )}
 
-      {/* RECAP COMPTES SUPPORTS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         {/* LDD */}
          <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
@@ -195,7 +185,6 @@ export default function ProjectsView() {
             </div>
          </div>
 
-         {/* CASDEN */}
          <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
@@ -219,7 +208,6 @@ export default function ProjectsView() {
          </div>
       </div>
 
-      {/* LISTE DES PROJETS */}
       <h3 className="font-bold text-slate-700 uppercase tracking-widest text-sm mt-8 mb-4 border-b pb-2">Projets en cours</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {(config.projects || []).length === 0 && !isCreating && (

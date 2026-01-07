@@ -52,13 +52,16 @@ export const BudgetProvider = ({ children }) => {
 
   // --- GESTION PROJETS (AVEC VIREMENT REEL ET HISTORIQUE MENSUEL) ---
   const addProject = (label, target, allocations) => {
-    const newProject = { id: Date.now().toString(), label, target: parseFloat(target), allocations };
+    // Sécurité : on s'assure que allocations est un objet valide
+    const safeAllocations = allocations || { ldd: 0, casden: 0 };
+    const newProject = { id: Date.now().toString(), label, target: parseFloat(target), allocations: safeAllocations };
     const n = { ...config, projects: [...(config.projects || []), newProject] };
     setConfig(n); saveData(n, monthlyData);
   };
+
   const removeProject = (id) => { const n = { ...config, projects: (config.projects || []).filter(p => p.id !== id) }; setConfig(n); saveData(n, monthlyData); };
 
-  // MISE A JOUR MAJEURE : On passe monthKey pour enregistrer la transaction ce mois-ci
+  // CORRECTION MAJEURE ICI : Sécurisation de l'objet allocations
   const fundProject = (projectId, amount, targetAccountId, monthKey) => {
     const val = parseFloat(amount) || 0;
     const project = (config.projects || []).find(p => p.id === projectId);
@@ -72,12 +75,17 @@ export const BudgetProvider = ({ children }) => {
     });
 
     // 2. Mise à jour du Projet (Allocations)
-    const currentAllocation = project.allocations[targetAccountId] || 0;
-    const updatedAllocations = { ...project.allocations, [targetAccountId]: currentAllocation + val };
-    const updatedProjects = config.projects.map(p => p.id === projectId ? { ...p, allocations: updatedAllocations } : p);
+    // IMPORTANT : On gère le cas où project.allocations n'existe pas encore (vieux projets)
+    const currentAllocations = project.allocations || {};
+    const currentAmountOnAccount = currentAllocations[targetAccountId] || 0;
+    
+    const updatedAllocations = { ...currentAllocations, [targetAccountId]: currentAmountOnAccount + val };
+    
+    const updatedProjects = config.projects.map(p => 
+        p.id === projectId ? { ...p, allocations: updatedAllocations } : p
+    );
 
     // 3. Enregistrement de la transaction dans le mois (pour le tableau annuel)
-    // Si monthKey n'est pas fourni (appel depuis ProjectsView), on utilise currentMonth
     const targetMonth = monthKey || currentMonth;
     const mData = monthlyData[targetMonth] || {};
     const transaction = { id: Date.now(), type: 'project', projectId, amount: val, targetAccountId };
@@ -95,21 +103,18 @@ export const BudgetProvider = ({ children }) => {
     saveData(n, newMData);
   };
 
-  // --- EPARGNE PRECAUTION (AVEC VIREMENT REEL ET HISTORIQUE) ---
+  // --- EPARGNE PRECAUTION ---
   const transferToSavings = (amount, note, monthKey) => {
     const val = parseFloat(amount) || 0;
     
-    // 1. Mouvement Bancaire
     const updatedComptes = config.comptes.map(c => {
       if (c.type === 'courant') return { ...c, initial: c.initial - val };
       if (c.id === config.savingsAccountId) return { ...c, initial: c.initial + val };
       return c;
     });
 
-    // 2. Historique Global
     const historyItem = { id: Date.now(), date: new Date().toLocaleDateString(), type: 'depot', amount: val, note: note || 'Virement' };
     
-    // 3. Enregistrement transaction mois (pour tableau annuel)
     const targetMonth = monthKey || currentMonth;
     const mData = monthlyData[targetMonth] || {};
     const transaction = { id: Date.now(), type: 'savings', amount: val, note };
