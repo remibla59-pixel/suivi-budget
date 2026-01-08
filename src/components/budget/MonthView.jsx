@@ -3,28 +3,19 @@ import { useBudget } from '../../hooks/useBudget';
 import { 
   ChevronLeft, ChevronRight, Plus, Trash2, 
   Lock, CheckCircle, Circle, ArrowRightLeft, 
-  Wallet, ShoppingBag, CreditCard, Coins, DollarSign 
+  Wallet, CreditCard, Coins, DollarSign 
 } from 'lucide-react';
+import { Card, CardHeader, CardContent } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
-
-const SmartInput = ({ value, onChange, placeholder, disabled, className, type="text" }) => {
-  const handleFocus = (e) => {
-    if (!disabled && (e.target.value.includes('Nouveau') || e.target.value === '0')) {
-      onChange('');
-    }
-  };
-  return (
-    <input value={value} type={type} disabled={disabled} onFocus={handleFocus} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className}/>
-  );
-};
 
 // --- COMPOSANT : Colonne Flexible ---
 const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
   
-  // CALCULS
   const totalSpent = round(expenses.reduce((sum, e) => sum + e.amount, 0));
   const remaining = round(cat.budget - totalSpent);
   const isOver = remaining < 0;
@@ -32,11 +23,11 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
   const handleSpend = () => { if (note && amount) { onSpend(cat.id, note, amount); setNote(''); setAmount(''); } };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="flex flex-col h-full hover:shadow-md transition-shadow">
       <div className="p-4 border-b border-slate-100 bg-slate-50">
         <div className="flex justify-between items-start mb-1">
            <span className="font-bold text-slate-800 text-sm">{cat.label}</span>
-           <span className="text-xs font-bold text-slate-400 bg-white px-2 py-0.5 rounded border">
+           <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded border uppercase">
              Obj: {cat.budget}€
            </span>
         </div>
@@ -60,15 +51,26 @@ const FlexibleBudgetColumn = ({ cat, expenses, onSpend, onRemove, isClosed }) =>
       </div>
 
       {!isClosed && (
-        <div className="p-3 border-t border-slate-100 bg-white">
-           <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none mb-2 focus:border-blue-400 bg-transparent"/>
+        <div className="p-3 border-t border-slate-100 bg-white space-y-2">
+           <input 
+             value={note} 
+             onChange={e => setNote(e.target.value)} 
+             placeholder="Note..." 
+             className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none focus:border-blue-400 bg-transparent"
+           />
            <div className="flex gap-2">
-             <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full border border-slate-200 rounded-lg text-xs p-2 text-right outline-none focus:border-blue-400"/>
-             <button onClick={handleSpend} disabled={!amount || !note} className="bg-slate-800 text-white p-2 rounded-lg hover:bg-black transition-colors disabled:opacity-30"><Plus size={16}/></button>
+             <input 
+               type="number" 
+               value={amount} 
+               onChange={e => setAmount(e.target.value)} 
+               placeholder="0.00" 
+               className="w-full border border-slate-200 rounded-xl text-xs p-2 text-right outline-none focus:border-blue-400"
+             />
+             <Button size="icon" onClick={handleSpend} disabled={!amount || !note} icon={Plus} />
            </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 
@@ -82,7 +84,7 @@ const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isCl
   const handleSpend = () => { if (note && amount) { onSpend(env.id, note, amount); setNote(''); setAmount(''); } };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="flex flex-col h-full hover:shadow-md transition-shadow">
       <div className={`p-4 border-b ${funded ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
         <div className="flex justify-between items-start mb-1">
            <span className="font-bold text-slate-800 text-sm truncate pr-2" title={env.label}>{env.label}</span>
@@ -92,7 +94,9 @@ const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isCl
         {funded ? (
           <div className="text-[10px] text-center text-emerald-600 font-bold bg-emerald-100/50 rounded-lg py-1 border border-emerald-200/50">Budget versé</div>
         ) : !isClosed ? (
-          <button onClick={() => onFund(env.id)} className="w-full text-[10px] uppercase font-black bg-white border border-emerald-200 text-emerald-600 py-2 rounded-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-1"><Plus size={12}/> Remplir ({env.budgetMonthly}€)</button>
+          <Button variant="outline" size="sm" className="w-full text-[10px] uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-50" onClick={() => onFund(env.id)} icon={Plus}>
+            Remplir ({env.budgetMonthly}€)
+          </Button>
         ) : (
           <div className="text-[10px] text-center text-slate-400 font-bold bg-slate-100 rounded-lg py-1 border border-slate-200">Non versé</div>
         )}
@@ -107,15 +111,26 @@ const EnvelopeColumn = ({ env, funded, expenses, onFund, onSpend, onRemove, isCl
         ))}
       </div>
       {!isClosed && (
-        <div className="p-3 border-t border-slate-100 bg-white">
-           <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note..." className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none mb-2 focus:border-blue-400 bg-transparent"/>
+        <div className="p-3 border-t border-slate-100 bg-white space-y-2">
+           <input 
+             value={note} 
+             onChange={e => setNote(e.target.value)} 
+             placeholder="Note..." 
+             className="w-full border-b border-slate-200 text-[11px] p-1.5 outline-none focus:border-blue-400 bg-transparent"
+           />
            <div className="flex gap-2">
-             <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full border border-slate-200 rounded-lg text-xs p-2 text-right outline-none focus:border-blue-400"/>
-             <button onClick={handleSpend} disabled={!amount || !note} className="bg-slate-800 text-white p-2 rounded-lg hover:bg-black transition-colors disabled:opacity-30"><Plus size={16}/></button>
+             <input 
+               type="number" 
+               value={amount} 
+               onChange={e => setAmount(e.target.value)} 
+               placeholder="0.00" 
+               className="w-full border border-slate-200 rounded-xl text-xs p-2 text-right outline-none focus:border-blue-400"
+             />
+             <Button size="icon" onClick={handleSpend} disabled={!amount || !note} icon={Plus} />
            </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 
@@ -197,22 +212,55 @@ export default function MonthView() {
 
       {/* KPI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-           <div className="flex justify-between items-center mb-4"><label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Entrées d'argent</label>{!isClosed && <button onClick={() => addIncomeLine(currentMonth)} className="text-emerald-600 bg-emerald-50 p-1.5 rounded-xl hover:bg-emerald-100"><Plus size={18}/></button>}</div>
-           <div className="space-y-3 max-h-40 overflow-y-auto pr-1">{revenusList.map(rev => (<div key={rev.id} className="flex gap-2 items-center"><SmartInput value={rev.label} disabled={isClosed} onChange={(v) => updateIncomeLine(currentMonth, rev.id, 'label', v)} className="w-full text-sm border-b border-transparent focus:border-emerald-300 outline-none font-medium bg-transparent" /><SmartInput type="number" value={rev.montant} disabled={isClosed} onChange={(v) => updateIncomeLine(currentMonth, rev.id, 'montant', v)} className="w-20 text-sm font-black text-right outline-none text-emerald-600 bg-transparent" />{!isClosed && <button onClick={() => removeIncomeLine(currentMonth, rev.id)} className="text-slate-200 hover:text-red-500"><Trash2 size={14}/></button>}</div>))}</div>
-           <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between font-black text-slate-800"><span>Total</span><span>{totalRevenus.toLocaleString()} €</span></div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center text-center">
+        <Card className="p-5">
+           <div className="flex justify-between items-center mb-4">
+             <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Entrées d'argent</label>
+             {!isClosed && (
+               <Button variant="ghost" size="icon" className="text-emerald-600 bg-emerald-50" onClick={() => addIncomeLine(currentMonth)} icon={Plus} />
+             )}
+           </div>
+           <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+             {revenusList.map(rev => (
+               <div key={rev.id} className="flex gap-2 items-center">
+                 <input 
+                   value={rev.label} 
+                   disabled={isClosed} 
+                   onChange={(v) => updateIncomeLine(currentMonth, rev.id, 'label', v.target.value)} 
+                   className="flex-1 text-sm border-b border-transparent focus:border-emerald-300 outline-none font-medium bg-transparent" 
+                 />
+                 <input 
+                   type="number" 
+                   value={rev.montant} 
+                   disabled={isClosed} 
+                   onChange={(v) => updateIncomeLine(currentMonth, rev.id, 'montant', v.target.value)} 
+                   className="w-20 text-sm font-black text-right outline-none text-emerald-600 bg-transparent" 
+                 />
+                 {!isClosed && (
+                   <button onClick={() => removeIncomeLine(currentMonth, rev.id)} className="text-slate-200 hover:text-red-500">
+                     <Trash2 size={14}/>
+                   </button>
+                 )}
+               </div>
+             ))}
+           </div>
+           <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between font-black text-slate-800">
+             <span>Total</span>
+             <span>{totalRevenus.toLocaleString()} €</span>
+           </div>
+        </Card>
+
+        <Card className="p-6 flex flex-col justify-center text-center">
           <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Sorties Compte Courant</label>
           <div className="text-4xl font-black text-slate-900">{totalSorties.toLocaleString()} €</div>
           <div className="text-[10px] text-slate-400 mt-2 font-bold italic bg-slate-50 rounded-full py-1 px-3 inline-block mx-auto">
             Dont Dépenses Courantes : {totalFlexibleSpent.toLocaleString()}€
           </div>
-        </div>
-        <div className={`p-6 rounded-3xl shadow-sm flex flex-col justify-center text-center border-2 ${resteAVivre >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+        </Card>
+
+        <Card className={`p-6 flex flex-col justify-center text-center border-2 ${resteAVivre >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
           <label className={`text-[10px] font-black uppercase tracking-widest mb-2 ${resteAVivre >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>Reste sur Compte</label>
           <div className={`text-4xl font-black ${resteAVivre >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{resteAVivre.toLocaleString()} €</div>
-        </div>
+        </Card>
       </div>
 
       {/* 1. DEPENSES COURANTES (4 COLONNES FLEXIBLES) */}
@@ -270,57 +318,119 @@ export default function MonthView() {
       </section>
 
       {/* 4. PROVISIONS */}
-      <section className="bg-white rounded-3xl shadow-sm overflow-hidden border border-blue-100 mt-10">
-        <div className="p-5 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center">
+      <Card className="border-blue-100 mt-10">
+        <CardHeader className="p-5 bg-blue-50/50 flex flex-row justify-between items-center">
           <h3 className="font-black text-blue-900 flex items-center gap-2"><ArrowRightLeft size={20}/> Provisions Annualisées</h3>
-          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">
+          <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm border border-blue-50">
             Livret Rémi
           </div>
-        </div>
-        <div className="p-6 space-y-6">
+        </CardHeader>
+        <CardContent className="space-y-6">
           
           {/* Virement (Basé sur N+1) */}
           <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-5 rounded-2xl border border-slate-100 shadow-sm gap-4">
             <div>
               <div className="font-black text-slate-800">Épargne Mensuelle Lissée</div>
-              <div className="text-xs text-slate-400 font-bold tracking-wider">
+              <div className="text-xs text-slate-400 font-bold tracking-wider uppercase">
                 Cible ({nextYear}) : {monthlyProvisionAmount}€ / mois
               </div>
             </div>
-            <button onClick={() => toggleMonthlyProvision(currentMonth, monthlyProvisionAmount)} disabled={isClosed} className={`w-full sm:w-auto px-8 py-3 rounded-2xl font-black transition-all ${isProvisionDone ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-600 text-white hover:bg-black shadow-lg shadow-blue-100'}`}>{isProvisionDone ? 'Virement Effectué' : 'Confirmer le virement'}</button>
+            <Button 
+              disabled={isClosed} 
+              variant={isProvisionDone ? 'secondary' : 'primary'}
+              className={`w-full sm:w-auto px-8 ${isProvisionDone ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : ''}`}
+              onClick={() => toggleMonthlyProvision(currentMonth, monthlyProvisionAmount)}
+            >
+              {isProvisionDone ? 'Virement Effectué' : 'Confirmer le virement'}
+            </Button>
           </div>
 
           {/* Paiement Factures (Basé sur N) */}
           <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-100">
-             <div className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Payer une facture via les provisions ({currentYear})</div>
-             <div className="space-y-2">{(mData.provisionExpenses || []).map(exp => (<div key={exp.id} className="flex justify-between items-center text-xs bg-white p-3 rounded-xl border border-slate-100 shadow-sm"><span className="font-bold text-slate-700">{exp.label}</span><div className="flex items-center gap-4"><span className="font-black text-orange-600">{round(exp.amount)} €</span>{!isClosed && <button onClick={() => removeProvisionExpense(currentMonth, exp.id, exp.amount, exp.provisionId)} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>}</div></div>))}</div>
+             <div className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Payer une facture ({currentYear})</div>
+             <div className="space-y-2">
+               {(mData.provisionExpenses || []).map(exp => (
+                 <div key={exp.id} className="flex justify-between items-center text-xs bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                   <span className="font-bold text-slate-700">{exp.label}</span>
+                   <div className="flex items-center gap-4">
+                     <span className="font-black text-orange-600">{round(exp.amount)} €</span>
+                     {!isClosed && <button onClick={() => removeProvisionExpense(currentMonth, exp.id, exp.amount, exp.provisionId)} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>}
+                   </div>
+                 </div>
+               ))}
+             </div>
              {!isClosed && (
                <div className="flex flex-col gap-3 mt-5">
-                 <select value={selectedProvId} onChange={(e) => setSelectedProvId(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"><option value="">-- Choisir la charge à payer --</option>{provisionsCurrentYear.map(p => (<option key={p.id} value={p.id}>{p.label} (Prévu: {p.amount}€)</option>))}</select>
-                 <div className="flex gap-2"><input type="text" placeholder="Note (ex: Régul)" value={provExpenseNote} onChange={(e) => setProvExpenseNote(e.target.value)} className="flex-1 p-3 border rounded-xl text-sm outline-none font-medium shadow-sm"/><input type="number" placeholder="0.00" value={provExpenseAmount} onChange={(e) => setProvExpenseAmount(e.target.value)} className="w-24 p-3 border rounded-xl text-sm text-right outline-none font-black shadow-sm"/><button onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} className="bg-orange-500 text-white px-4 rounded-xl hover:bg-black shadow-lg shadow-orange-100"><DollarSign size={20} /></button></div>
+                 <select 
+                   value={selectedProvId} 
+                   onChange={(e) => setSelectedProvId(e.target.value)} 
+                   className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold bg-white outline-none shadow-sm"
+                 >
+                   <option value="">-- Choisir la charge à payer --</option>
+                   {provisionsCurrentYear.map(p => (
+                     <option key={p.id} value={p.id}>{p.label} (Prévu: {p.amount}€)</option>
+                   ))}
+                 </select>
+                 <div className="flex gap-2">
+                   <Input 
+                     placeholder="Note (ex: Régul)" 
+                     value={provExpenseNote} 
+                     onChange={(e) => setProvExpenseNote(e.target.value)} 
+                     className="flex-1"
+                   />
+                   <Input 
+                     type="number" 
+                     placeholder="0.00" 
+                     value={provExpenseAmount} 
+                     onChange={(e) => setProvExpenseAmount(e.target.value)} 
+                     className="w-32"
+                   />
+                   <Button variant="dark" onClick={handleAddProvExpense} disabled={!selectedProvId || !provExpenseAmount} icon={DollarSign} />
+                 </div>
                </div>
              )}
           </div>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       {/* 5. FIXES */}
-      <section className="bg-white rounded-3xl shadow-sm overflow-hidden p-6 border border-slate-100 mt-10">
+      <Card className="p-6 border-slate-100 mt-10">
         <h3 className="font-black text-slate-800 mb-6 flex items-center gap-2"><Lock size={20} className="text-slate-300"/> Prélèvements Automatiques</h3>
         <div className="grid gap-3">
           {config.postes.filter(p => p.type === 'fixe').map(p => {
             const isChecked = mData.fixedStatus?.[p.id] || false;
+            const currentAmount = mData.depenses?.[p.id] ?? p.montant;
             return (
               <div key={p.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-50'}`}>
-                <div className="flex items-center gap-4"><button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-transform active:scale-90 ${isChecked ? 'text-emerald-500' : 'text-slate-200 hover:text-slate-400'}`}>{isChecked ? <CheckCircle size={30} fill="currentColor" className="text-white" /> : <Circle size={30} />}</button><span className={`text-sm font-bold ${isChecked ? 'text-emerald-800' : 'text-slate-700'}`}>{p.label}</span></div>
-                <div className="flex items-center gap-2"><SmartInput type="number" disabled={isClosed} value={mData.depenses?.[p.id] ?? p.montant} onChange={(v) => updateFixedExpense(currentMonth, p.id, v)} className={`w-24 text-right p-1.5 bg-transparent border-b outline-none font-black text-lg ${isChecked ? 'text-emerald-700 border-emerald-200' : 'text-slate-800 border-slate-200'}`} /><span className="text-[10px] font-black text-slate-300">€</span></div>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => toggleFixedCheck(currentMonth, p.id)} disabled={isClosed} className={`transition-transform active:scale-90 ${isChecked ? 'text-emerald-500' : 'text-slate-200 hover:text-slate-400'}`}>
+                    {isChecked ? <CheckCircle size={30} fill="currentColor" className="text-white" /> : <Circle size={30} />}
+                  </button>
+                  <span className={`text-sm font-bold ${isChecked ? 'text-emerald-800' : 'text-slate-700'}`}>{p.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    disabled={isClosed} 
+                    value={currentAmount} 
+                    onChange={(v) => updateFixedExpense(currentMonth, p.id, v.target.value)} 
+                    className={`w-24 text-right p-1.5 bg-transparent border-b outline-none font-black text-lg ${isChecked ? 'text-emerald-700 border-emerald-200' : 'text-slate-800 border-slate-200'}`} 
+                  />
+                  <span className="text-[10px] font-black text-slate-300">€</span>
+                </div>
               </div>
             );
           })}
         </div>
-      </section>
+      </Card>
 
-      {!isClosed && <div className="flex justify-center pt-10"><button onClick={() => { if(window.confirm("Voulez-vous vraiment clôturer ce mois ?")) { validateMonth(currentMonth); } }} className="bg-slate-900 text-white px-12 py-5 rounded-full font-black shadow-2xl hover:scale-105 transition-all flex items-center gap-3 border-4 border-slate-100"><CheckCircle /> Clôturer le mois</button></div>}
+      {!isClosed && (
+        <div className="flex justify-center pt-10">
+          <Button variant="dark" size="lg" className="px-12 py-6 rounded-full border-4 border-slate-100" onClick={() => { if(window.confirm("Voulez-vous vraiment clôturer ce mois ?")) { validateMonth(currentMonth); } }} icon={CheckCircle}>
+            Clôturer le mois
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
