@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
 import { BarChart3, Plus, X, PiggyBank, Target } from 'lucide-react';
+import { Card, CardHeader, CardContent } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input, Select } from '../ui/Input';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -30,53 +33,46 @@ const AllocationModal = ({ isOpen, onClose, type, monthKey }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
-          <h3 className="font-bold flex items-center gap-2">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-sm shadow-2xl animate-in fade-in zoom-in-95 duration-200 border-none">
+        <CardHeader className="bg-slate-900 text-white flex flex-row justify-between items-center p-4">
+          <h3 className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
             {type === 'savings' ? <PiggyBank size={18}/> : <Target size={18}/>}
-            {type === 'savings' ? 'Vers Épargne (Précaution)' : 'Financer un Projet'}
+            {type === 'savings' ? 'Épargne' : 'Projet'}
           </h3>
-          <button onClick={onClose} className="text-white/60 hover:text-white"><X size={20}/></button>
-        </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white hover:bg-white/10" icon={X} />
+        </CardHeader>
         
-        <div className="p-6 space-y-4">
-          
-          {/* CHAMP MONTANT */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Montant (€)</label>
+        <CardContent className="p-6 space-y-6">
+          <div className="relative">
             <input 
               type="number" 
               autoFocus
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="w-full text-2xl font-black p-2 border-b-2 border-slate-200 outline-none focus:border-blue-500 text-slate-800"
-              placeholder="0.00"
+              className="w-full text-5xl font-black p-4 text-center bg-transparent outline-none text-slate-800 placeholder:text-slate-100"
+              placeholder="0"
             />
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-300 text-2xl font-black">€</span>
           </div>
 
-          {/* CHAMPS SPECIFIQUES EPARGNE */}
           {type === 'savings' && (
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Note (Optionnel)</label>
-              <input 
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                className="w-full p-2 border border-slate-200 rounded-lg outline-none text-sm"
-                placeholder="Ex: Prime, Reste mois..."
-              />
-            </div>
+            <Input 
+              label="Note (Optionnel)"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Ex: Prime, Reste mois..."
+            />
           )}
 
-          {/* CHAMPS SPECIFIQUES PROJETS */}
           {type === 'project' && (
-            <>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Choisir le Projet</label>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Choisir le Projet</label>
                 <select 
                   value={selectedProject}
                   onChange={e => setSelectedProject(e.target.value)}
-                  className="w-full p-2 border border-slate-200 rounded-lg outline-none text-sm font-bold bg-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm font-black transition-all outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-50"
                 >
                   <option value="">-- Sélectionner --</option>
                   {(config.projects || []).map(p => (
@@ -84,35 +80,34 @@ const AllocationModal = ({ isOpen, onClose, type, monthKey }) => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Compte Cible</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Compte Cible</label>
                 <select 
                   value={targetAccount}
                   onChange={e => setTargetAccount(e.target.value)}
-                  className="w-full p-2 border border-slate-200 rounded-lg outline-none text-sm bg-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 text-sm font-black transition-all outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-50"
                 >
                   <option value="ldd">LDD Véro</option>
                   <option value="casden">Compte CASDEN</option>
                 </select>
               </div>
-            </>
+            </div>
           )}
 
-          <div className="pt-2">
-            <button 
+          <div className="pt-4 space-y-3">
+            <Button 
               onClick={handleConfirm}
               disabled={!amount || (type === 'project' && !selectedProject)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50"
+              className="w-full py-6 rounded-2xl text-lg"
             >
               Valider le virement
-            </button>
-            <p className="text-[10px] text-center text-slate-400 mt-2">
-              Cela débitera votre Compte Courant.
+            </Button>
+            <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest">
+              Débit du compte courant
             </p>
           </div>
-
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -149,9 +144,13 @@ export default function AnalysisView() {
     const totalRevenus = round((mData.revenusList || []).reduce((sum, r) => sum + (r.montant || 0), 0));
 
     // DEPENSES
-    const totalFixe = round(config.postes.filter(p => p.type === 'fixe').reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
+    // On ne compte que les charges fixes validées (cochées) dans la vue mensuelle
+    const totalFixeValide = round(config.postes
+      .filter(p => p.type === 'fixe' && mData.fixedStatus?.[p.id])
+      .reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
+    
     const totalEpargneFixe = round(config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0));
-    const totalChargesFixes = totalFixe + totalEpargneFixe;
+    const totalChargesFixes = totalFixeValide + totalEpargneFixe;
     const totalFlexibleSpent = round((mData.flexibleExpenses || []).reduce((sum, e) => sum + e.amount, 0));
     const totalEnvObligatoires = config.envelopes.filter(e => e.category === 'courant').reduce((sum, env) => sum + (mData[`funded_${env.id}`] ? env.budgetMonthly : 0), 0);
     const totalEnvSecondaires = config.envelopes.filter(e => e.category === 'secondaire').reduce((sum, env) => sum + (mData[`funded_${env.id}`] ? env.budgetMonthly : 0), 0);
@@ -189,23 +188,26 @@ export default function AnalysisView() {
         monthKey={modalMonth}
       />
 
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <h2 className="text-2xl font-black flex items-center gap-3"><BarChart3 className="text-blue-400" size={32} /> Vue Annuelle & Trésorerie</h2>
-          <p className="text-slate-400 text-sm mt-1">Pilotage du Reste à Vivre et des reports mensuels.</p>
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-6">
+          <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-sm"><BarChart3 className="text-blue-400" size={32} /></div>
+          <div>
+            <h2 className="text-3xl font-black">Vue Annuelle</h2>
+            <p className="text-slate-400 font-medium uppercase text-[10px] tracking-widest mt-1">Pilotage Trésorerie & Reports</p>
+          </div>
         </div>
-        <div className="flex items-center gap-4 bg-white/10 p-2 rounded-xl">
-           <span className="font-bold text-sm">Année :</span>
-           <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-slate-800 border-none font-black text-xl text-white cursor-pointer rounded outline-none">
-             {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+        <div className="flex items-center gap-4 bg-white/10 p-3 rounded-2xl border border-white/10">
+           <span className="font-black text-xs uppercase tracking-widest opacity-60">Année</span>
+           <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent border-none font-black text-2xl text-white cursor-pointer rounded outline-none focus:ring-0">
+             {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y} className="text-black">{y}</option>)}
            </select>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <Card className="overflow-hidden border-slate-200">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+          <table className="w-full text-sm text-left border-collapse">
+            <thead className="bg-slate-50/80 text-slate-400 font-black uppercase text-[10px] tracking-widest border-b border-slate-200">
               <tr>
                 <th className="p-4 sticky left-0 bg-slate-50 z-10 min-w-[150px]">Rubriques</th>
                 {annualData.map(d => <th key={d.monthKey} className="p-4 text-right min-w-[120px]">{d.label}</th>)}
@@ -217,8 +219,8 @@ export default function AnalysisView() {
                 {annualData.map((d, i) => <td key={d.monthKey} className="p-4 text-right font-bold text-blue-600">{i === 0 ? <div className="flex items-center justify-end gap-1"><input type="number" value={initialBalance} onChange={(e) => setInitialBalance(parseFloat(e.target.value)||0)} className="w-16 bg-white border border-blue-200 rounded px-1 text-right text-xs" /><span>€</span></div> : <span>{round(annualData[i-1].soldeFinal).toLocaleString()} €</span>}</td>)}
               </tr>
               <tr><td className="p-4 sticky left-0 bg-white font-bold">Total Revenus (+)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-emerald-600 font-bold">{d.totalRevenus.toLocaleString()} €</td>)}</tr>
-              <tr className="bg-slate-100/50 font-black"><td className="p-4 sticky left-0 bg-slate-100">Total Disponible</td>{annualData.map((d, i) => { const prev = i === 0 ? initialBalance : annualData[i-1].soldeFinal; return <td key={d.monthKey} className="p-4 text-right">{round(prev + d.totalRevenus).toLocaleString()} €</td>})}</tr>
-              <tr><td className="p-4 sticky left-0 bg-white">Charges Fixes (-)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-red-400">{d.totalChargesFixes.toLocaleString()} €</td>)}</tr>
+              <tr className="bg-slate-100/50 font-black text-slate-900 border-y border-slate-200"><td className="p-4 sticky left-0 bg-slate-100">Total Disponible</td>{annualData.map((d, i) => { const prev = i === 0 ? initialBalance : annualData[i-1].soldeFinal; return <td key={d.monthKey} className="p-4 text-right">{round(prev + d.totalRevenus).toLocaleString()} €</td>})}</tr>
+              <tr><td className="p-4 sticky left-0 bg-white">Charges Fixes (Val.) (-)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-red-400">{d.totalChargesFixes.toLocaleString()} €</td>)}</tr>
               <tr><td className="p-4 sticky left-0 bg-white">Dépenses Courantes (-)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-orange-500">{d.totalFlexibleSpent.toLocaleString()} €</td>)}</tr>
               <tr><td className="p-4 sticky left-0 bg-white">Env. Obligatoires (-)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-slate-500">{d.totalEnvObligatoires.toLocaleString()} €</td>)}</tr>
               <tr><td className="p-4 sticky left-0 bg-white">Env. Secondaires (-)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-slate-500">{d.totalEnvSecondaires.toLocaleString()} €</td>)}</tr>
@@ -227,30 +229,34 @@ export default function AnalysisView() {
               
               {/* LIGNES AVEC BOUTONS D'ACTION */}
               <tr className="bg-purple-50/30">
-                <td className="p-4 sticky left-0 bg-purple-50/30 text-purple-700 font-bold text-xs">Vers Épargne (Précaution)</td>
+                <td className="p-4 sticky left-0 bg-purple-50/30 text-purple-700 font-bold text-xs uppercase tracking-widest">Vers Épargne</td>
                 {annualData.map(d => (
-                  <td key={d.monthKey} className="p-2 text-right relative group">
-                    <span className="font-bold text-purple-800">{d.allocSavings > 0 ? d.allocSavings.toLocaleString() + ' €' : '-'}</span>
-                    <button onClick={() => openModal('savings', d.monthKey)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-purple-600 text-white rounded-full p-1 hover:scale-110 transition-all shadow-sm"><Plus size={10}/></button>
+                  <td key={d.monthKey} className="p-4 text-right relative group">
+                    <span className="font-black text-purple-800">{d.allocSavings > 0 ? d.allocSavings.toLocaleString() + ' €' : '-'}</span>
+                    {!monthlyData[d.monthKey]?.isClosed && (
+                      <button onClick={() => openModal('savings', d.monthKey)} className="absolute top-1/2 -translate-y-1/2 right-2 opacity-0 group-hover:opacity-100 bg-purple-600 text-white rounded-lg p-1 hover:scale-110 transition-all shadow-lg shadow-purple-200"><Plus size={14}/></button>
+                    )}
                   </td>
                 ))}
               </tr>
               <tr className="bg-indigo-50/30">
-                <td className="p-4 sticky left-0 bg-indigo-50/30 text-indigo-700 font-bold text-xs">Vers Projets</td>
+                <td className="p-4 sticky left-0 bg-indigo-50/30 text-indigo-700 font-bold text-xs uppercase tracking-widest">Vers Projets</td>
                 {annualData.map(d => (
-                  <td key={d.monthKey} className="p-2 text-right relative group">
-                    <span className="font-bold text-indigo-800">{d.allocProjects > 0 ? d.allocProjects.toLocaleString() + ' €' : '-'}</span>
-                    <button onClick={() => openModal('project', d.monthKey)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-indigo-600 text-white rounded-full p-1 hover:scale-110 transition-all shadow-sm"><Plus size={10}/></button>
+                  <td key={d.monthKey} className="p-4 text-right relative group">
+                    <span className="font-black text-indigo-800">{d.allocProjects > 0 ? d.allocProjects.toLocaleString() + ' €' : '-'}</span>
+                    {!monthlyData[d.monthKey]?.isClosed && (
+                      <button onClick={() => openModal('project', d.monthKey)} className="absolute top-1/2 -translate-y-1/2 right-2 opacity-0 group-hover:opacity-100 bg-indigo-600 text-white rounded-lg p-1 hover:scale-110 transition-all shadow-lg shadow-indigo-200"><Plus size={14}/></button>
+                    )}
                   </td>
                 ))}
               </tr>
 
               <tr className="bg-emerald-50 border-t-2 border-emerald-100 font-black text-lg"><td className="p-4 sticky left-0 bg-emerald-50 text-emerald-800">RESTE (Report N+1)</td>{annualData.map(d => <td key={d.monthKey} className="p-4 text-right text-emerald-700">{d.soldeFinal.toLocaleString()} €</td>)}</tr>
-              <tr><td className="p-4 sticky left-0 bg-white font-bold text-xs text-slate-400">Notes</td>{annualData.map(d => <td key={d.monthKey} className="p-2 min-w-[150px]"><textarea value={d.note} onChange={(e) => updateAnalysisData(d.monthKey, 'analysis_note', e.target.value)} placeholder="Note..." rows="2" className="w-full text-[10px] p-1.5 rounded border border-slate-100 bg-slate-50 resize-none focus:bg-white outline-none"/></td>)}</tr>
+              <tr><td className="p-4 sticky left-0 bg-white font-black text-[10px] text-slate-400 uppercase tracking-widest">Notes & Observations</td>{annualData.map(d => <td key={d.monthKey} className="p-2 min-w-[150px]"><textarea value={d.note} onChange={(e) => updateAnalysisData(d.monthKey, 'analysis_note', e.target.value)} placeholder="Ajouter une note..." rows="2" className="w-full text-[10px] p-2 rounded-xl border border-slate-100 bg-slate-50 resize-none focus:bg-white focus:border-blue-200 outline-none transition-all font-medium"/></td>)}</tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

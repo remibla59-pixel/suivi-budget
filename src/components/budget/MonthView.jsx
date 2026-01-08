@@ -162,7 +162,10 @@ export default function MonthView() {
   const monthlyProvisionAmount = Math.round(totalAnnualProvisionsNextYear / 12);
   const isProvisionDone = mData.provisionDone || false;
 
-  const totalFixe = round(config.postes.filter(p => p.type === 'fixe').reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
+  const totalFixeValide = round(config.postes
+    .filter(p => p.type === 'fixe' && mData.fixedStatus?.[p.id])
+    .reduce((sum, p) => sum + (mData.depenses?.[p.id] ?? p.montant), 0));
+  
   const totalEpargne = round(config.epargneCibles.reduce((sum, e) => sum + e.mensuel, 0));
   const fundedEnvelopesAmount = config.envelopes.reduce((sum, env) => sum + (mData[`funded_${env.id}`] ? env.budgetMonthly : 0), 0);
   
@@ -170,7 +173,7 @@ export default function MonthView() {
   const flexibleExpenses = mData.flexibleExpenses || [];
   const totalFlexibleSpent = round(flexibleExpenses.reduce((sum, e) => sum + e.amount, 0));
 
-  const totalSorties = round(totalFixe + totalEpargne + (isProvisionDone ? monthlyProvisionAmount : 0) + fundedEnvelopesAmount + totalFlexibleSpent);
+  const totalSorties = round(totalFixeValide + totalEpargne + (isProvisionDone ? monthlyProvisionAmount : 0) + fundedEnvelopesAmount + totalFlexibleSpent);
   const resteAVivre = round(totalRevenus - totalSorties);
 
   const [selectedProvId, setSelectedProvId] = useState('');
@@ -395,7 +398,14 @@ export default function MonthView() {
 
       {/* 5. FIXES */}
       <Card className="p-6 border-slate-100 mt-10">
-        <h3 className="font-black text-slate-800 mb-6 flex items-center gap-2"><Lock size={20} className="text-slate-300"/> Prélèvements Automatiques</h3>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-black text-slate-800 flex items-center gap-2">
+            <Lock size={20} className="text-slate-300"/> Dépenses mensuelles fixes
+          </h3>
+          <div className="bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-xl border border-emerald-100 font-black text-xs uppercase tracking-widest">
+            Total validé : {totalFixeValide.toLocaleString()} €
+          </div>
+        </div>
         <div className="grid gap-3">
           {config.postes.filter(p => p.type === 'fixe').map(p => {
             const isChecked = mData.fixedStatus?.[p.id] || false;

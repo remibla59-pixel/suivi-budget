@@ -1,6 +1,14 @@
 import React from 'react';
 
-export const Input = ({ label, icon: Icon, className = '', ...props }) => {
+export const Input = ({ label, icon: Icon, className = '', onFocus, onChange, value, ...props }) => {
+  const handleFocus = (e) => {
+    const val = e.target.value;
+    if (val === '0' || (typeof val === 'string' && (val.includes('Nouveau') || val.includes('Nouvelle')))) {
+      if (onChange) onChange({ target: { value: '' } });
+    }
+    if (onFocus) onFocus(e);
+  };
+
   return (
     <div className={`space-y-1.5 ${className}`}>
       {label && (
@@ -22,6 +30,9 @@ export const Input = ({ label, icon: Icon, className = '', ...props }) => {
             placeholder:text-slate-400
             ${Icon ? 'pl-11' : ''}
           `}
+          value={value}
+          onChange={onChange}
+          onFocus={handleFocus}
           {...props}
         />
       </div>
