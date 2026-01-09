@@ -4,6 +4,10 @@ import { BarChart3, Plus, X, PiggyBank, Target } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Input';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, BarChart, Bar, Legend
+} from 'recharts';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -202,6 +206,84 @@ export default function AnalysisView() {
              {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y} className="text-black">{y}</option>)}
            </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <CardHeader className="px-0 pt-0 mb-6 bg-transparent border-none">
+            <h3 className="font-black text-xs uppercase tracking-widest text-slate-400">Évolution de la Trésorerie</h3>
+          </CardHeader>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={annualData}>
+                <defs>
+                  <linearGradient id="colorSolde" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="label" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
+                  tickFormatter={(val) => `${val}€`}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(val) => [`${val.toLocaleString()} €`, 'Solde Final']}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="soldeFinal" 
+                  stroke="#3b82f6" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorSolde)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <CardHeader className="px-0 pt-0 mb-6 bg-transparent border-none">
+            <h3 className="font-black text-xs uppercase tracking-widest text-slate-400">Revenus vs Dépenses</h3>
+          </CardHeader>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={annualData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="label" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
+                  tickFormatter={(val) => `${val}€`}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                <Bar dataKey="totalRevenus" name="Revenus" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="totalSorties" name="Dépenses" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       </div>
 
       <Card className="overflow-hidden border-slate-200">

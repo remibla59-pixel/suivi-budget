@@ -8,6 +8,7 @@ import {
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -197,6 +198,13 @@ export default function MonthView() {
   };
   const handleReopen = () => { if(confirm("⚠️ Rouvrir le mois ?")) reopenMonth(currentMonth); };
 
+  const chartData = [
+    { name: 'Charges Fixes', value: totalFixeValide, color: '#f43f5e' },
+    { name: 'Courant', value: totalFlexibleSpent, color: '#3b82f6' },
+    { name: 'Enveloppes', value: fundedEnvelopesAmount, color: '#10b981' },
+    { name: 'Épargne/Prov.', value: (isProvisionDone ? monthlyProvisionAmount : 0) + totalEpargne, color: '#8b5cf6' },
+  ].filter(d => d.value > 0);
+
   return (
     <div className="max-w-6xl mx-auto p-2 sm:p-4 space-y-8 pb-24">
       
@@ -213,8 +221,9 @@ export default function MonthView() {
         <button onClick={() => changeMonth(1)} className="p-3 hover:bg-white/10 rounded-2xl"><ChevronRight /></button>
       </div>
 
-      {/* KPI */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* KPI & REPARTITION */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-5">
            <div className="flex justify-between items-center mb-4">
              <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Entrées d'argent</label>
@@ -260,9 +269,42 @@ export default function MonthView() {
           </div>
         </Card>
 
-        <Card className={`p-6 flex flex-col justify-center text-center border-2 ${resteAVivre >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-          <label className={`text-[10px] font-black uppercase tracking-widest mb-2 ${resteAVivre >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>Reste sur Compte</label>
-          <div className={`text-4xl font-black ${resteAVivre >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{resteAVivre.toLocaleString()} €</div>
+          <Card className={`p-6 flex flex-col justify-center text-center border-2 ${resteAVivre >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+            <label className={`text-[10px] font-black uppercase tracking-widest mb-2 ${resteAVivre >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>Reste sur Compte</label>
+            <div className={`text-4xl font-black ${resteAVivre >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{resteAVivre.toLocaleString()} €</div>
+          </Card>
+        </div>
+
+        <Card className="p-4 flex flex-col items-center justify-center min-h-[200px]">
+           <div className="w-full h-full min-h-[180px]">
+             <ResponsiveContainer width="100%" height="100%">
+               <PieChart>
+                 <Pie
+                   data={chartData}
+                   innerRadius={40}
+                   outerRadius={60}
+                   paddingAngle={5}
+                   dataKey="value"
+                 >
+                   {chartData.map((entry, index) => (
+                     <Cell key={`cell-${index}`} fill={entry.color} />
+                   ))}
+                 </Pie>
+                 <RechartsTooltip 
+                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }}
+                   formatter={(val) => `${val}€`}
+                 />
+               </PieChart>
+             </ResponsiveContainer>
+           </div>
+           <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+              {chartData.map(d => (
+                <div key={d.name} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{d.name}</span>
+                </div>
+              ))}
+           </div>
         </Card>
       </div>
 

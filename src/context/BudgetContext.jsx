@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, onSnapshot, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, deleteDoc, runTransaction } from "firebase/firestore";
 
 export const BudgetContext = createContext();
 
@@ -150,75 +150,112 @@ export const BudgetProvider = ({ children }) => {
     saveData(newConfig, monthlyData);
   };
 
-  const fundProject = (projectId, amount, targetAccountId, monthKey) => {
+  const fundProject = async (projectId, amount, targetAccountId, monthKey) => {
+    if (!user) return;
     const val = parseFloat(amount) || 0;
-    const project = (config.projects || []).find(p => p.id === projectId);
-    if (!project) return;
-    
-    // A. Mouvement Bancaire (Courant -> Cible)
-    const updatedComptes = config.comptes.map(c => {
-      if (c.type === 'courant') return { ...c, initial: c.initial - val };
-      if (c.id === targetAccountId) return { ...c, initial: c.initial + val };
-      return c;
-    });
-
-    // B. Mise à jour du Projet (Allocations)
-    const currentAllocations = project.allocations || {};
-    const currentAmountOnAccount = currentAllocations[targetAccountId] || 0;
-    const updatedAllocations = { ...currentAllocations, [targetAccountId]: currentAmountOnAccount + val };
-    
-    const updatedProjects = config.projects.map(p => 
-        p.id === projectId ? { ...p, allocations: updatedAllocations } : p
-    );
-
-    // C. Enregistrement transaction (pour Tableau Annuel)
     const targetMonth = monthKey || currentMonth;
-    const mData = monthlyData[targetMonth] || {};
-    const transaction = { id: Date.now(), type: 'project', projectId, amount: val, targetAccountId };
-    const newMData = {
-        ...monthlyData,
-        [targetMonth]: {
-            ...mData,
-            allocationsList: [...(mData.allocationsList || []), transaction]
-        }
-    };
+    const docRef = doc(db, "budget_2026", user.uid);
 
-    const newConfig = { ...config, comptes: updatedComptes, projects: updatedProjects };
-    setConfig(newConfig); 
-    setMonthlyData(newMData);
-    saveData(newConfig, newMData);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(docRef);
+        if (!sfDoc.exists()) return;
+
+        const data = sfDoc.data();
+        const currentConfig = data.config || DEFAULT_CONFIG;
+        const currentMonthlyData = data.monthlyData || {};
+        
+        // 1. Mouvement Bancaire
+        const updatedComptes = currentConfig.comptes.map(c => {
+          if (c.type === 'courant') return { ...c, initial: (c.initial || 0) - val };
+          if (c.id === targetAccountId) return { ...c, initial: (c.initial || 0) + val };
+          return c;
+        });
+
+        // 2. Mise à jour du Projet
+        const updatedProjects = (currentConfig.projects || []).map(p => {
+          if (p.id === projectId) {
+            const currentAllocations = p.allocations || {};
+            return { 
+              ...p, 
+              allocations: { 
+                ...currentAllocations, 
+                [targetAccountId]: (currentAllocations[targetAccountId] || 0) + val 
+              } 
+            };
+          }
+          return p;
+        });
+
+        // 3. Historique Mensuel
+        const mData = currentMonthlyData[targetMonth] || {};
+        const logEntry = { id: Date.now(), type: 'project', projectId, amount: val, targetAccountId };
+        const updatedMonthlyData = {
+          ...currentMonthlyData,
+          [targetMonth]: {
+            ...mData,
+            allocationsList: [...(mData.allocationsList || []), logEntry]
+          }
+        };
+
+        transaction.update(docRef, { 
+          config: { ...currentConfig, comptes: updatedComptes, projects: updatedProjects },
+          monthlyData: updatedMonthlyData 
+        });
+      });
+    } catch (e) {
+      console.error("Transaction failed: ", e);
+      alert("Erreur lors du virement. Veuillez réessayer.");
+    }
   };
 
   // --- 5. EPARGNE PRECAUTION (SÉCURISÉ & TRANSACTIONS) ---
-  const transferToSavings = (amount, note, monthKey) => {
+  const transferToSavings = async (amount, note, monthKey) => {
+    if (!user) return;
     const val = parseFloat(amount) || 0;
-    
-    // A. Mouvement Bancaire
-    const updatedComptes = config.comptes.map(c => {
-      if (c.type === 'courant') return { ...c, initial: c.initial - val };
-      if (c.id === config.savingsAccountId) return { ...c, initial: c.initial + val };
-      return c;
-    });
-
-    // B. Historique Global
-    const historyItem = { id: Date.now(), date: new Date().toLocaleDateString(), type: 'depot', amount: val, note: note || 'Virement' };
-    
-    // C. Enregistrement transaction (pour Tableau Annuel)
     const targetMonth = monthKey || currentMonth;
-    const mData = monthlyData[targetMonth] || {};
-    const transaction = { id: Date.now(), type: 'savings', amount: val, note };
-    const newMData = {
-        ...monthlyData,
-        [targetMonth]: {
-            ...mData,
-            allocationsList: [...(mData.allocationsList || []), transaction]
-        }
-    };
+    const docRef = doc(db, "budget_2026", user.uid);
 
-    const newConfig = { ...config, comptes: updatedComptes, savingsHistory: [historyItem, ...(config.savingsHistory || [])].slice(0, 50) };
-    setConfig(newConfig);
-    setMonthlyData(newMData);
-    saveData(newConfig, newMData);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(docRef);
+        if (!sfDoc.exists()) return;
+
+        const data = sfDoc.data();
+        const currentConfig = data.config || DEFAULT_CONFIG;
+        const currentMonthlyData = data.monthlyData || {};
+
+        const updatedComptes = currentConfig.comptes.map(c => {
+          if (c.type === 'courant') return { ...c, initial: (c.initial || 0) - val };
+          if (c.id === currentConfig.savingsAccountId) return { ...c, initial: (c.initial || 0) + val };
+          return c;
+        });
+
+        const historyItem = { id: Date.now(), date: new Date().toLocaleDateString(), type: 'depot', amount: val, note: note || 'Virement' };
+        const mData = currentMonthlyData[targetMonth] || {};
+        const logEntry = { id: Date.now(), type: 'savings', amount: val, note };
+
+        const updatedMonthlyData = {
+          ...currentMonthlyData,
+          [targetMonth]: {
+            ...mData,
+            allocationsList: [...(mData.allocationsList || []), logEntry]
+          }
+        };
+
+        transaction.update(docRef, { 
+          config: { 
+            ...currentConfig, 
+            comptes: updatedComptes, 
+            savingsHistory: [historyItem, ...(currentConfig.savingsHistory || [])].slice(0, 50) 
+          },
+          monthlyData: updatedMonthlyData 
+        });
+      });
+    } catch (e) {
+      console.error("Transaction failed: ", e);
+      alert("Erreur lors du virement épargne.");
+    }
   };
 
   const retrieveFromSavings = (amount, note) => {
