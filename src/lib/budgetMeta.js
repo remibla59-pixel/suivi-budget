@@ -21,6 +21,7 @@ export const NAV_LABELS = {
   analysis: 'Trésorerie',
   projects: 'Projets',
   savings: 'Épargne',
+  import: 'Import',
   config: 'Config',
 };
 

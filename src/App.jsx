@@ -8,11 +8,12 @@ import AnnualView from './components/budget/AnnualView';
 import EnvelopesConfigView from './components/budget/EnvelopesConfigView';
 import SavingsView from './components/budget/SavingsView';
 import ProjectsView from './components/budget/ProjectsView';
-import AnalysisView from './components/budget/AnalysisView'; // <-- NOUVEAU IMPORT
+import AnalysisView from './components/budget/AnalysisView';
+import ImportView from './components/budget/ImportView';
 
 import {
   LayoutDashboard, Settings, LogOut, Loader2,
-  PiggyBank, Wallet, ShieldCheck, Target, BarChart3 // <-- ICONE
+  PiggyBank, Wallet, ShieldCheck, Target, BarChart3, FileUp
 } from 'lucide-react';
 import { NAV_LABELS } from './lib/budgetMeta';
 
@@ -67,6 +68,7 @@ function AppContent() {
             <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={BarChart3} label={NAV_LABELS.analysis} title="Trésorerie — Vue Annuelle" />
             <NavButton active={view === 'projects'} onClick={() => setView('projects')} icon={Target} label={NAV_LABELS.projects} title="Grands Projets" />
             <NavButton active={view === 'savings'} onClick={() => setView('savings')} icon={ShieldCheck} label={NAV_LABELS.savings} title="Épargne de Précaution" />
+            <NavButton active={view === 'import'} onClick={() => setView('import')} icon={FileUp} label={NAV_LABELS.import} title="Importer un relevé bancaire (OFX)" />
             <NavButton active={view === 'config'} onClick={() => setView('config')} icon={Settings} label={NAV_LABELS.config} title="Paramètres" />
           </div>
 
@@ -83,6 +85,7 @@ function AppContent() {
         {view === 'analysis' && <AnalysisView />} 
         {view === 'projects' && <ProjectsView />}
         {view === 'savings' && <SavingsView />}
+        {view === 'import' && <ImportView />}
         {view === 'config' && <ConfigPanel />}
       </main>
     </div>

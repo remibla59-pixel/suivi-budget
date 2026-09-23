@@ -11,6 +11,7 @@ import {
   buildBalanceAdjustment,
   closingBlockers,
 } from '../lib/budgetMath';
+import { applyBankImport, learnBankImportRules } from '../lib/bankImport';
 
 const DEFAULT_CONFIG = {
   comptes: [
@@ -38,7 +39,9 @@ const DEFAULT_CONFIG = {
   savingsAccountId: 'livretA',
   savingsHistory: [],
   openingBalances: {}, // Solde de départ par exercice (persisté au lieu d'un état local non sauvegardé)
-  balanceAdjustments: [] // Rapprochements bancaires (solde réel) datés et confirmés
+  balanceAdjustments: [], // Rapprochements bancaires (solde réel) datés et confirmés
+  bankImportKeys: [], // Opérations déjà importées depuis un relevé (anti-doublon)
+  bankImportRules: [] // Classements mémorisés (libellé → charge, enveloppe, provision…)
 };
 
 export const BudgetProvider = ({ children }) => {
@@ -115,6 +118,36 @@ export const BudgetProvider = ({ children }) => {
       console.error("Erreur import:", error);
       alert("Erreur lors de l'importation.");
     }
+  };
+
+  // --- 2 bis. IMPORT D'UN RELEVÉ BANCAIRE (OFX) ---
+  // Les lignes validées dans l'écran d'import sont appliquées d'un coup : soldes,
+  // enveloppes, provisions et revenus. Les clés des opérations importées sont
+  // mémorisées pour ne jamais les réimporter, et les classements choisis (sauf
+  // option contraire) sont conservés pour rapprocher automatiquement les suivants.
+  const importBankTransactions = (rows, { learn = true } = {}) => {
+    if (!user) return null;
+    const result = applyBankImport({ config, monthlyData, rows });
+    const previousRules = config.bankImportRules || [];
+    const nextRules = learn ? learnBankImportRules(previousRules, rows) : previousRules;
+    const rulesChanged = nextRules.some((r, i) => r.match !== previousRules[i]?.match || r.target !== previousRules[i]?.target)
+      || nextRules.length !== previousRules.length;
+    if (result.applied.length === 0 && !rulesChanged) return result;
+    const nextConfig = { ...result.config, bankImportRules: nextRules };
+    setConfig(nextConfig);
+    setMonthlyData(result.monthlyData);
+    saveData(nextConfig, result.monthlyData);
+    return { ...result, config: nextConfig };
+  };
+
+  // Retire un classement mémorisé (ou tous) : les prochains imports reviennent à la suggestion automatique.
+  const forgetBankImportRule = (match) => {
+    const n = { ...config, bankImportRules: (config.bankImportRules || []).filter(r => r.match !== match) };
+    setConfig(n); saveData(n, monthlyData);
+  };
+  const clearBankImportRules = () => {
+    const n = { ...config, bankImportRules: [] };
+    setConfig(n); saveData(n, monthlyData);
   };
 
   // --- 3. HELPER COMPTES & ANALYSE ---
@@ -455,6 +488,7 @@ export const BudgetProvider = ({ children }) => {
       user, loading, login, logout, config, monthlyData, currentMonth, setCurrentMonth,
       updateConfigPoste, addConfigPoste, removeConfigPoste, updateAccountInitial,
       setProvisionAccount, setSavingsAccount, setOpeningBalance, adjustRealBalance,
+      importBankTransactions, forgetBankImportRule, clearBankImportRules,
       addIncomeLine, updateIncomeLine, removeIncomeLine,
       updateFixedExpense, payFixedCharge, unpayFixedCharge, updateFixedDate,
       validateMonth, reopenMonth, resetAllData, importAllData,
