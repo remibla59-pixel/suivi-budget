@@ -10,10 +10,11 @@ import SavingsView from './components/budget/SavingsView';
 import ProjectsView from './components/budget/ProjectsView';
 import AnalysisView from './components/budget/AnalysisView'; // <-- NOUVEAU IMPORT
 
-import { 
-  LayoutDashboard, Settings, LogOut, Loader2, 
+import {
+  LayoutDashboard, Settings, LogOut, Loader2,
   PiggyBank, Wallet, ShieldCheck, Target, BarChart3 // <-- ICONE
 } from 'lucide-react';
+import { NAV_LABELS } from './lib/budgetMeta';
 
 function AppContent() {
   const { user, loading, login, logout } = useBudget();
@@ -60,13 +61,13 @@ function AppContent() {
           </div>
 
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl">
-            <NavButton active={view === 'month'} onClick={() => setView('month')} icon={LayoutDashboard} label="Mensuel" />
-            <NavButton active={view === 'envelopes'} onClick={() => setView('envelopes')} icon={Wallet} label="Env." />
-            <NavButton active={view === 'annual'} onClick={() => setView('annual')} icon={PiggyBank} label="Prov." />
-            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={BarChart3} label="Année" />
-            <NavButton active={view === 'projects'} onClick={() => setView('projects')} icon={Target} label="Projets" />
-            <NavButton active={view === 'savings'} onClick={() => setView('savings')} icon={ShieldCheck} label="Épargne" />
-            <NavButton active={view === 'config'} onClick={() => setView('config')} icon={Settings} label="Config" />
+            <NavButton active={view === 'month'} onClick={() => setView('month')} icon={LayoutDashboard} label={NAV_LABELS.monthly} title="Vue Mensuelle" />
+            <NavButton active={view === 'envelopes'} onClick={() => setView('envelopes')} icon={Wallet} label={NAV_LABELS.envelopes} title="Enveloppes & Dépenses Courantes" />
+            <NavButton active={view === 'annual'} onClick={() => setView('annual')} icon={PiggyBank} label={NAV_LABELS.provisions} title="Provisions Annualisées" />
+            <NavButton active={view === 'analysis'} onClick={() => setView('analysis')} icon={BarChart3} label={NAV_LABELS.analysis} title="Trésorerie — Vue Annuelle" />
+            <NavButton active={view === 'projects'} onClick={() => setView('projects')} icon={Target} label={NAV_LABELS.projects} title="Grands Projets" />
+            <NavButton active={view === 'savings'} onClick={() => setView('savings')} icon={ShieldCheck} label={NAV_LABELS.savings} title="Épargne de Précaution" />
+            <NavButton active={view === 'config'} onClick={() => setView('config')} icon={Settings} label={NAV_LABELS.config} title="Paramètres" />
           </div>
 
           <button onClick={logout} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all" title="Déconnexion">
@@ -88,9 +89,10 @@ function AppContent() {
   );
 }
 
-const NavButton = ({ active, onClick, icon: Icon, label }) => (
+const NavButton = ({ active, onClick, icon: Icon, label, title }) => (
   <button 
     onClick={onClick} 
+    title={title || label}
     className={`px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all duration-300 text-sm font-bold ${
       active ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
     }`}

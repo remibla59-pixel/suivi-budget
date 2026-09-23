@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
-import { Target, Plus, Trash2, TrendingUp, PiggyBank, Coins } from 'lucide-react';
+import { Target, Plus, Trash2, PiggyBank, Coins } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Input';
+import ConfirmTransferModal from './ConfirmTransferModal';
 
-const ProjectCard = ({ project, onFund, onRemove }) => {
+const ACCOUNT_ACCENTS = [
+  'bg-purple-50 text-purple-600 border-purple-100',
+  'bg-blue-50 text-blue-600 border-blue-100',
+  'bg-amber-50 text-amber-600 border-amber-100',
+  'bg-teal-50 text-teal-600 border-teal-100',
+];
+
+const ProjectCard = ({ project, accounts, onRequestFund, onRemove }) => {
   const [fundAmount, setFundAmount] = useState('');
-  const [targetAccount, setTargetAccount] = useState('ldd'); 
-  
-  const currentTotal = (project.allocations?.ldd || 0) + (project.allocations?.casden || 0);
-  const progress = Math.min((currentTotal / project.target) * 100, 100);
+  const [targetAccount, setTargetAccount] = useState(accounts[0]?.id || '');
+
+  const allocations = project.allocations || {};
+  const currentTotal = accounts.reduce((sum, a) => sum + (allocations[a.id] || 0), 0);
+  const progress = project.target > 0 ? Math.min((currentTotal / project.target) * 100, 100) : 0;
 
   return (
     <Card className="flex flex-col h-full hover:shadow-md transition-shadow">
@@ -31,13 +40,12 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
             <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 shadow-sm" style={{ width: `${progress}%` }}></div>
           </div>
           
-          <div className="flex gap-2 text-[10px]">
-            <span className="bg-purple-50 text-purple-600 px-2 py-1 rounded-lg font-bold border border-purple-100">
-               LDD : {(project.allocations?.ldd || 0).toLocaleString()}€
-            </span>
-            <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-bold border border-blue-100">
-               CASDEN : {(project.allocations?.casden || 0).toLocaleString()}€
-            </span>
+          <div className="flex flex-wrap gap-2 text-[10px]">
+            {accounts.map((a, i) => (
+              <span key={a.id} className={`px-2 py-1 rounded-lg font-bold border ${ACCOUNT_ACCENTS[i % ACCOUNT_ACCENTS.length]}`}>
+                {a.label} : {(allocations[a.id] || 0).toLocaleString()}€
+              </span>
+            ))}
           </div>
         </div>
       </CardContent>
@@ -54,8 +62,8 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
                   className="flex-1"
                 />
                 <Button 
-                  onClick={() => { if(fundAmount) { onFund(project.id, fundAmount, targetAccount); setFundAmount(''); }}}
-                  disabled={!fundAmount}
+                  onClick={() => { if(fundAmount && targetAccount) { onRequestFund(project, fundAmount, targetAccount); setFundAmount(''); }}}
+                  disabled={!fundAmount || !targetAccount}
                   variant="dark"
                   icon={Plus}
                   size="icon"
@@ -64,10 +72,7 @@ const ProjectCard = ({ project, onFund, onRemove }) => {
              <Select 
                value={targetAccount} 
                onChange={(e) => setTargetAccount(e.target.value)}
-               options={[
-                 { value: 'ldd', label: 'Vers LDD Véro' },
-                 { value: 'casden', label: 'Vers Compte CASDEN' }
-               ]}
+               options={accounts.map(a => ({ value: a.id, label: `Vers ${a.label}` }))}
                className="h-8 py-1 px-2 text-[10px]"
              />
            </div>
@@ -82,29 +87,41 @@ export default function ProjectsView() {
   
   const [newLabel, setNewLabel] = useState('');
   const [newTarget, setNewTarget] = useState('');
-  const [initLDD, setInitLDD] = useState('');    
-  const [initCasden, setInitCasden] = useState('');
+  const [initAlloc, setInitAlloc] = useState({});
+  // Pop-up de confirmation : le virement d'alimentation a-t-il réellement été effectué ?
+  const [pending, setPending] = useState(null);
+
+  // Comptes cibles issus de la configuration (plus d'identifiants codés en dur)
+  const projectAccounts = (config.comptes || []).filter(c => c.type === 'epargne');
 
   const handleCreate = () => {
     if(newLabel && newTarget) {
-      const allocations = {
-        ldd: parseFloat(initLDD) || 0,
-        casden: parseFloat(initCasden) || 0
-      };
+      const allocations = projectAccounts.reduce(
+        (acc, a) => ({ ...acc, [a.id]: parseFloat(initAlloc[a.id]) || 0 }),
+        {}
+      );
       addProject(newLabel, newTarget, allocations);
-      setNewLabel(''); setNewTarget(''); setInitLDD(''); setInitCasden(''); setIsCreating(false);
+      setNewLabel(''); setNewTarget(''); setInitAlloc({}); setIsCreating(false);
     }
   };
 
-  const totalLDD = config.comptes.find(c=>c.id==='ldd')?.initial || 0;
-  const totalCasden = config.comptes.find(c=>c.id==='casden')?.initial || 0;
-  
-  const assignedLDD = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.ldd || 0), 0);
-  const assignedCasden = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.casden || 0), 0);
+  const requestFund = (project, amount, targetAccountId) => {
+    const account = projectAccounts.find(a => a.id === targetAccountId);
+    setPending({
+      from: 'Compte Courant',
+      to: `${project.label} — ${account?.label || 'Compte cible'}`,
+      amount,
+      note: `Alimentation du projet « ${project.label} »`,
+      confirmLabel: 'Oui, le virement est fait',
+      onConfirm: (date) => fundProject(project.id, amount, targetAccountId, undefined, date)
+    });
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-4 pb-20 space-y-8">
-      
+
+      <ConfirmTransferModal transfer={pending} onConfirm={(date) => pending?.onConfirm(date)} onClose={() => setPending(null)} />
+
       <div className="bg-gradient-to-r from-indigo-900 to-purple-800 text-white p-8 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
           <h2 className="text-3xl font-black flex items-center gap-3">
@@ -136,14 +153,12 @@ export default function ProjectsView() {
               <div className="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Allocations Initiales</label>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                     <div className="w-24 text-xs font-black text-purple-600 uppercase tracking-tighter">Sur LDD</div>
-                     <Input type="number" value={initLDD} onChange={e=>setInitLDD(e.target.value)} placeholder="0" className="flex-1" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                     <div className="w-24 text-xs font-black text-blue-600 uppercase tracking-tighter">Sur CASDEN</div>
-                     <Input type="number" value={initCasden} onChange={e=>setInitCasden(e.target.value)} placeholder="0" className="flex-1" />
-                  </div>
+                  {projectAccounts.map((a, i) => (
+                    <div key={a.id} className="flex items-center gap-3">
+                       <div className={`w-24 text-xs font-black uppercase tracking-tighter ${ACCOUNT_ACCENTS[i % ACCOUNT_ACCENTS.length].split(' ')[1]}`}>{a.label}</div>
+                       <Input type="number" value={initAlloc[a.id] || ''} onChange={e=>setInitAlloc({ ...initAlloc, [a.id]: e.target.value })} placeholder="0" className="flex-1" />
+                    </div>
+                  ))}
                 </div>
                 <p className="text-[10px] text-slate-400 italic text-center mt-4 font-medium leading-relaxed">Ces montants seront réservés sur vos comptes sans virement bancaire.</p>
               </div>
@@ -156,50 +171,37 @@ export default function ProjectsView() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         <Card className="p-5 border-purple-100">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-3">
-                 <div className="p-3 bg-purple-50 rounded-2xl text-purple-600"><PiggyBank size={24}/></div>
-                 <div>
-                   <span className="font-black text-slate-700 block tracking-tight leading-none mb-1">LDD Véro</span>
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Solde : {Math.round(totalLDD).toLocaleString()} €</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {projectAccounts.map((account, i) => {
+          const total = Math.round(account.initial || 0);
+          const assigned = (config.projects || []).reduce((sum, p) => sum + (p.allocations?.[account.id] || 0), 0);
+          const available = total - assigned;
+          const pct = total > 0 ? Math.min((assigned / total) * 100, 100) : 0;
+          const accent = ACCOUNT_ACCENTS[i % ACCOUNT_ACCENTS.length];
+          return (
+            <Card key={account.id} className="p-5 border-slate-100">
+               <div className="flex justify-between items-center mb-4">
+                 <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl border ${accent}`}><PiggyBank size={24}/></div>
+                    <div>
+                      <span className="font-black text-slate-700 block tracking-tight leading-none mb-1">{account.label}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Solde réel : {total.toLocaleString()} €</span>
+                    </div>
                  </div>
-              </div>
-              <div className="text-right">
-                <span className="block text-[10px] font-black uppercase text-purple-400 tracking-widest mb-1">Disponible</span>
-                <span className="font-black text-2xl text-purple-700">{(totalLDD - assignedLDD).toLocaleString()} €</span>
-              </div>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-               <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min((assignedLDD/totalLDD)*100, 100)}%` }}></div>
-            </div>
-            <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-tighter">
-               <span>Affecté : {assignedLDD.toLocaleString()} €</span>
-            </div>
-         </Card>
-
-         <Card className="p-5 border-blue-100">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-3">
-                 <div className="p-3 bg-blue-50 rounded-2xl text-blue-600"><TrendingUp size={24}/></div>
-                 <div>
-                   <span className="font-black text-slate-700 block tracking-tight leading-none mb-1">Compte CASDEN</span>
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Solde : {Math.round(totalCasden).toLocaleString()} €</span>
+                 <div className="text-right">
+                   <span className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Disponible</span>
+                   <span className={`font-black text-2xl ${available < 0 ? 'text-red-600' : 'text-slate-800'}`}>{available.toLocaleString()} €</span>
                  </div>
-              </div>
-              <div className="text-right">
-                <span className="block text-[10px] font-black uppercase text-blue-400 tracking-widest mb-1">Disponible</span>
-                <span className="font-black text-2xl text-blue-700">{(totalCasden - assignedCasden).toLocaleString()} €</span>
-              </div>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((assignedCasden/totalCasden)*100, 100)}%` }}></div>
-            </div>
-            <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-tighter">
-               <span>Affecté : {assignedCasden.toLocaleString()} €</span>
-            </div>
-         </Card>
+               </div>
+               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-slate-800 rounded-full" style={{ width: `${pct}%` }}></div>
+               </div>
+               <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-tighter">
+                  <span>Affecté : {assigned.toLocaleString()} €</span>
+               </div>
+            </Card>
+          );
+        })}
       </div>
 
       <h3 className="font-bold text-slate-700 uppercase tracking-widest text-sm mt-8 mb-4 border-b pb-2">Projets en cours</h3>
@@ -212,7 +214,7 @@ export default function ProjectsView() {
           </div>
         )}
         {(config.projects || []).map(p => (
-          <ProjectCard key={p.id} project={p} onFund={fundProject} onRemove={removeProject} />
+          <ProjectCard key={p.id} project={p} accounts={projectAccounts} onRequestFund={requestFund} onRemove={removeProject} />
         ))}
       </div>
     </div>

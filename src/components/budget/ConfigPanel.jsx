@@ -7,6 +7,8 @@ import {
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Input';
+import { PRIORITY_OPTIONS } from '../ui/Priority';
+import { LABELS, ACCOUNT_TYPES } from '../../lib/budgetMeta';
 
 const SmartInput = ({ value, onChange, placeholder, isNumber, icon }) => {
   const handleFocus = (e) => {
@@ -31,7 +33,7 @@ const SmartInput = ({ value, onChange, placeholder, isNumber, icon }) => {
 export default function ConfigPanel() {
   const { 
     config, updateConfigPoste, addConfigPoste, removeConfigPoste, 
-    updateAccountInitial, setProvisionAccount, resetAllData 
+    updateAccountInitial, setProvisionAccount, setSavingsAccount, resetAllData 
   } = useBudget();
 
   return (
@@ -57,7 +59,7 @@ export default function ConfigPanel() {
                    <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100"><CreditCard size={20} className="text-blue-500" /></div>
                    <div>
                      <span className="font-bold text-slate-700 block">{compte.label}</span>
-                     <span className="text-[10px] uppercase font-black text-slate-400 tracking-widest">{compte.type}</span>
+                     <span className="text-[10px] uppercase font-black text-slate-400 tracking-widest">{ACCOUNT_TYPES[compte.type] || compte.type}</span>
                    </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -78,7 +80,7 @@ export default function ConfigPanel() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="bg-blue-50/50 border-blue-100">
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-blue-700 font-bold"><PiggyBank size={20} /><span>Cible des Provisions</span></div>
+            <div className="flex items-center gap-2 text-blue-700 font-bold"><PiggyBank size={20} /><span>Cible {LABELS.provisions}</span></div>
             <Select 
               value={config.provisionAccountId || ''} 
               onChange={(e) => setProvisionAccount(e.target.value)}
@@ -92,10 +94,15 @@ export default function ConfigPanel() {
         
         <Card className="bg-emerald-50/50 border-emerald-100">
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-emerald-700 font-bold"><ShieldCheck size={20} /><span>Cible Épargne Précaution</span></div>
-            <div className="w-full p-3 rounded-2xl bg-white border border-emerald-100 shadow-sm font-bold text-emerald-900 text-sm">
-              Livret A Véro (Précaution)
-            </div>
+            <div className="flex items-center gap-2 text-emerald-700 font-bold"><ShieldCheck size={20} /><span>Cible {LABELS.savings}</span></div>
+            <Select 
+              value={config.savingsAccountId || ''} 
+              onChange={(e) => setSavingsAccount(e.target.value)}
+              options={[
+                { value: '', label: 'Sélectionner un compte' },
+                ...config.comptes.map(c => ({ value: c.id, label: c.label }))
+              ]}
+            />
           </CardContent>
         </Card>
       </div>
@@ -115,6 +122,12 @@ export default function ConfigPanel() {
             {config.postes.filter(p => p.type === 'fixe').map(poste => (
               <div key={poste.id} className="flex gap-3 items-center group">
                 <SmartInput value={poste.label} onChange={(v) => updateConfigPoste({ ...poste, label: v })} placeholder="Nom" />
+                <Select
+                  value={poste.priority || 'important'}
+                  onChange={(e) => updateConfigPoste({ ...poste, priority: e.target.value })}
+                  options={PRIORITY_OPTIONS}
+                  className="w-36 shrink-0"
+                />
                 <div className="flex items-center gap-2">
                   <SmartInput isNumber value={poste.montant} onChange={(v) => updateConfigPoste({ ...poste, montant: parseFloat(v) || 0 })} />
                   <span className="text-slate-400 font-bold">€</span>

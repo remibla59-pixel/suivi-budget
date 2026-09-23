@@ -3,7 +3,9 @@ import { useBudget } from '../../hooks/useBudget';
 import { Wallet, PlusCircle, Trash2, Coins, CreditCard } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { Input, Select } from '../ui/Input';
+import { PRIORITY_OPTIONS } from '../ui/Priority';
+import { LABELS } from '../../lib/budgetMeta';
 
 const SmartInput = ({ value, onChange, placeholder, isNumber, label, className = '' }) => {
   const handleFocus = (e) => {
@@ -27,7 +29,7 @@ const SmartInput = ({ value, onChange, placeholder, isNumber, label, className =
 };
 
 export default function EnvelopesConfigView() {
-  const { config, updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig, updateFlexibleBudget } = useBudget();
+  const { config, updateEnvelopeConfig, addEnvelopeConfig, removeEnvelopeConfig, updateFlexibleBudget, updateFlexiblePriority } = useBudget();
   const envelopes = config.envelopes || [];
   const budgetsFlexibles = config.budgetsFlexibles || [];
 
@@ -50,8 +52,16 @@ export default function EnvelopesConfigView() {
           ) : (
             filteredEnvelopes.map(env => (
               <div key={env.id} className="p-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-center hover:bg-slate-50/50 transition-colors group">
-                <div className="col-span-4">
+                <div className="col-span-3">
                   <SmartInput label="Nom de l'enveloppe" value={env.label} onChange={(v) => updateEnvelopeConfig({ ...env, label: v })} />
+                </div>
+                <div className="col-span-2">
+                  <Select
+                    label="Priorité"
+                    value={env.priority || 'important'}
+                    onChange={(e) => updateEnvelopeConfig({ ...env, priority: e.target.value })}
+                    options={PRIORITY_OPTIONS}
+                  />
                 </div>
                 <div className="col-span-3">
                    <div className="flex items-center gap-2">
@@ -65,7 +75,7 @@ export default function EnvelopesConfigView() {
                      <span className="text-blue-500 font-black text-sm pt-6">€</span>
                    </div>
                 </div>
-                <div className="col-span-2 flex justify-end pt-5">
+                <div className="col-span-1 flex justify-end pt-5">
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -87,8 +97,8 @@ export default function EnvelopesConfigView() {
       <div className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white p-8 rounded-3xl shadow-xl flex items-center gap-6">
         <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md"><Wallet className="text-emerald-300" size={32} /></div>
         <div>
-          <h2 className="text-3xl font-black leading-tight">Configuration Budgets</h2>
-          <p className="text-emerald-100 font-medium opacity-80 uppercase text-[10px] tracking-widest mt-1">Définissez vos objectifs de dépenses et vos cagnottes.</p>
+          <h2 className="text-3xl font-black leading-tight">Enveloppes & {LABELS.flexible}</h2>
+          <p className="text-emerald-100 font-medium opacity-80 uppercase text-[10px] tracking-widest mt-1">Définissez vos objectifs mensuels, vos cagnottes et leur niveau de priorité.</p>
         </div>
       </div>
 
@@ -96,13 +106,19 @@ export default function EnvelopesConfigView() {
       <Card className="border-blue-100 overflow-hidden mb-8">
         <CardHeader className="p-4 bg-blue-50/50 border-b border-blue-100 flex flex-row items-center gap-2">
            <CreditCard size={18} className="text-blue-600"/>
-           <h3 className="font-black text-blue-800 uppercase tracking-widest text-xs">Dépenses Courantes (Objectifs Mensuels)</h3>
+           <h3 className="font-black text-blue-800 uppercase tracking-widest text-xs">{LABELS.flexible} (Objectifs Mensuels)</h3>
         </CardHeader>
         <CardContent className="p-0 divide-y divide-slate-100">
            {budgetsFlexibles.map(budget => (
              <div key={budget.id} className="p-4 px-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-center hover:bg-blue-50/30 transition-colors">
                 <div className="col-span-6 font-black text-slate-700 uppercase text-sm tracking-tight">{budget.label}</div>
                 <div className="col-span-6 flex items-center justify-end gap-3">
+                   <Select
+                     value={budget.priority || 'important'}
+                     onChange={(e) => updateFlexiblePriority(budget.id, e.target.value)}
+                     options={PRIORITY_OPTIONS}
+                     className="w-36"
+                   />
                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Budget Cible :</label>
                    <SmartInput isNumber value={budget.budget} onChange={(v) => updateFlexibleBudget(budget.id, v)} className="w-32" />
                    <span className="text-slate-400 font-black">€</span>
@@ -112,8 +128,8 @@ export default function EnvelopesConfigView() {
         </CardContent>
       </Card>
 
-      {renderEnvelopeSection("Enveloppes Obligatoires", "courant", Wallet)}
-      {renderEnvelopeSection("Enveloppes Secondaires", "secondaire", Coins)}
+      {renderEnvelopeSection(LABELS.envelopesObligatoires, "courant", Wallet)}
+      {renderEnvelopeSection(LABELS.envelopesSecondaires, "secondaire", Coins)}
 
       <div className="text-center text-[11px] text-slate-400 italic">Modifications sauvegardées automatiquement.</div>
     </div>

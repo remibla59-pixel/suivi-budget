@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
-import { 
-  PiggyBank, PlusCircle, Trash2, Calendar, 
+import {
+  PiggyBank, PlusCircle, Trash2, Calendar,
   AlertTriangle, CheckCircle, ChevronDown, ChevronUp,
   Info
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { LABELS, formatShortDate } from '../../lib/budgetMeta';
 
 const round = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
@@ -91,7 +92,7 @@ const ProvisionRow = ({ prov, selectedYear, updateProvisionItem, removeProvision
             {prov.history.map((h, idx) => (
               <div key={idx} className="flex justify-between items-center text-xs text-slate-600 bg-white p-2 rounded border border-slate-200 shadow-sm">
                 <div className="flex gap-4">
-                  <span className="font-bold text-blue-600 w-16">{h.date}</span>
+                  <span className="font-bold text-blue-600 w-16">{formatShortDate(h.date)}</span>
                   <span className="italic">{h.label}</span>
                 </div>
                 <span className="font-bold text-orange-600">-{h.amount} €</span>
@@ -106,14 +107,19 @@ const ProvisionRow = ({ prov, selectedYear, updateProvisionItem, removeProvision
 
 export default function AnnualView() {
   const { config, addProvisionItem, updateProvisionItem, removeProvisionItem } = useBudget();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  
+  // Deux sous-catégories parallèles : année en cours / année N+1
+  const currentYear = String(new Date().getFullYear());
+  const nextYear = String(Number(currentYear) + 1);
+  const [tab, setTab] = useState('current');
+  const selectedYear = tab === 'next' ? nextYear : currentYear;
+
   const provisions = config.provisionsByYear?.[selectedYear] || [];
-  
+
   // CALCULS GLOBAUX
   const totalAnnual = round(provisions.reduce((sum, p) => sum + (p.amount || 0), 0));
   const monthlyTransfer = Math.round(totalAnnual / 12);
   const totalSpent = round(provisions.reduce((sum, p) => sum + (p.spent || 0), 0));
+  const transferYear = String(Number(selectedYear) - 1);
 
   const compteProv = config.comptes.find(c => c.id === config.provisionAccountId);
   const soldeReelLivret = compteProv ? compteProv.initial : 0;
@@ -126,20 +132,30 @@ export default function AnnualView() {
         <div className="space-y-2 text-center md:text-left">
           <h2 className="text-3xl font-black flex items-center justify-center md:justify-start gap-3">
             <PiggyBank className="text-yellow-400" size={32} /> 
-            Provisions Annualisées
+            {LABELS.provisions}
           </h2>
           <p className="text-blue-200 text-sm font-medium opacity-80 uppercase text-[10px] tracking-widest">Gestion des charges lourdes lissées sur l'année</p>
         </div>
         
-        <div className="flex items-center gap-3 bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
-          <Calendar className="text-blue-300" size={20}/>
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(e.target.value)} 
-            className="bg-transparent text-white font-black rounded px-2 py-1 outline-none cursor-pointer"
-          >
-            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y} className="text-black">{y}</option>)}
-          </select>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-3 bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/20">
+            <Calendar className="text-blue-300" size={20}/>
+            <span className="font-black text-xl">{selectedYear}</span>
+          </div>
+          <div className="flex bg-white/10 p-1 rounded-2xl border border-white/20">
+            <button
+              onClick={() => setTab('current')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tab === 'current' ? 'bg-white text-blue-900' : 'text-blue-100 hover:bg-white/10'}`}
+            >
+              Année en cours ({currentYear})
+            </button>
+            <button
+              onClick={() => setTab('next')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tab === 'next' ? 'bg-white text-blue-900' : 'text-blue-100 hover:bg-white/10'}`}
+            >
+              Année N+1 ({nextYear})
+            </button>
+          </div>
         </div>
       </div>
 
@@ -154,13 +170,13 @@ export default function AnnualView() {
         <Card className="bg-blue-600 p-6 shadow-lg text-white border-none transform hover:scale-[1.02] transition-transform">
           <div className="text-blue-100 text-[10px] uppercase font-black mb-2 tracking-widest">Virement Mensuel</div>
           <div className="text-4xl font-black">{monthlyTransfer.toLocaleString()} €</div>
-          <div className="text-[10px] font-bold text-blue-200 mt-2 uppercase opacity-80">À provisionner par mois</div>
+          <div className="text-[10px] font-bold text-blue-200 mt-2 uppercase opacity-80">À provisionner chaque mois de {transferYear} pour {selectedYear}</div>
         </Card>
 
         <Card className="p-6 border-indigo-100">
-          <div className="text-indigo-600 text-[10px] uppercase font-black mb-2 tracking-widest">Solde Réel Livret</div>
+          <div className="text-indigo-600 text-[10px] uppercase font-black mb-2 tracking-widest">Solde sur le compte</div>
           <div className="text-4xl font-black text-indigo-700">{Math.round(soldeReelLivret).toLocaleString()} €</div>
-          <div className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Dépensé : <span className="text-orange-500 font-black">{totalSpent}€</span></div>
+          <div className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{compteProv?.label || 'Compte Provisions'} — Dépensé ({selectedYear}) : <span className="text-orange-500 font-black">{totalSpent}€</span></div>
         </Card>
       </div>
 
@@ -214,7 +230,7 @@ export default function AnnualView() {
       <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 shadow-sm">
          <Info className="text-amber-500 shrink-0" size={20} />
          <p className="text-xs text-amber-800 leading-relaxed font-medium">
-           <strong>Fonctionnement :</strong> Les montants payés sont automatiquement déduits du solde de votre livret lors de la saisie d'une dépense "Provision" dans la vue mensuelle. Le "Virement Mensuel" permet d'anticiper ces dépenses pour ne pas impacter votre compte courant le mois J.
+           <strong>Fonctionnement :</strong> deux sous-catégories parallèles — <strong>Année en cours</strong> (les factures de {currentYear}, payées depuis le compte {compteProv?.label || 'Provisions'}) et <strong>Année N+1</strong> (les charges à provisionner). Le « Virement Mensuel » indiqué correspond au montant lissé à virer chaque mois de {transferYear} ; le virement est débité du compte courant et crédité sur le compte provisions quand vous le confirmez dans la vue mensuelle.
          </p>
       </div>
     </div>

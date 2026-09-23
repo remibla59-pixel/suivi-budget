@@ -4,37 +4,57 @@ import { ShieldCheck, ArrowRight, ArrowLeft, History } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import ConfirmTransferModal from './ConfirmTransferModal';
+import { LABELS, formatShortDate } from '../../lib/budgetMeta';
 
 export default function SavingsView() {
   const { config, transferToSavings, retrieveFromSavings } = useBudget();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Pop-up de confirmation : l'opération a-t-elle réellement été faite en banque ?
+  const [pending, setPending] = useState(null);
 
   const savingsAccount = config.comptes.find(c => c.id === config.savingsAccountId) || { initial: 0 };
   const currentAccount = config.comptes.find(c => c.type === 'courant') || { initial: 0 };
   const history = config.savingsHistory || [];
 
+  const savingsLabel = savingsAccount.label || LABELS.savings;
+
   const handleTransfer = () => {
     if(!amount || amount <= 0) return;
-    transferToSavings(amount, note || 'Virement ponctuel');
-    setAmount(''); setNote('');
+    const motif = note || 'Virement ponctuel';
+    setPending({
+      from: 'Compte Courant',
+      to: savingsLabel,
+      amount,
+      note: motif,
+      confirmLabel: 'Oui, le dépôt est fait',
+      onConfirm: (date) => { transferToSavings(amount, motif, undefined, date); setAmount(''); setNote(''); }
+    });
   };
 
   const handleRetrieve = () => {
     if(!amount || amount <= 0) return;
-    if(confirm("Confirmer le retrait ?")) {
-      retrieveFromSavings(amount, note || 'Retrait ponctuel');
-      setAmount(''); setNote('');
-    }
+    const motif = note || 'Retrait ponctuel';
+    setPending({
+      from: savingsLabel,
+      to: 'Compte Courant',
+      amount,
+      note: motif,
+      confirmLabel: 'Oui, le retrait est fait',
+      onConfirm: (date) => { retrieveFromSavings(amount, motif, undefined, date); setAmount(''); setNote(''); }
+    });
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4 pb-20 space-y-8">
-      
+
+      <ConfirmTransferModal transfer={pending} onConfirm={(date) => pending?.onConfirm(date)} onClose={() => setPending(null)} />
+
       <div className="bg-gradient-to-r from-teal-800 to-emerald-700 text-white p-8 rounded-3xl shadow-xl flex items-center gap-6">
         <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm"><ShieldCheck size={40} className="text-teal-100" /></div>
         <div>
-          <h2 className="text-3xl font-black">Épargne de Précaution</h2>
+          <h2 className="text-3xl font-black">{LABELS.savings}</h2>
           <p className="text-teal-100 font-medium opacity-80 uppercase text-xs tracking-widest mt-1">Fonds d'urgence & Sécurité (Livret Véro)</p>
         </div>
       </div>
@@ -45,7 +65,7 @@ export default function SavingsView() {
            <span className="text-3xl font-black text-slate-800">{Math.round(currentAccount.initial).toLocaleString()} €</span>
         </Card>
         <Card className="p-6 flex flex-col items-center text-center border-emerald-200 bg-emerald-50/30">
-           <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest mb-2">Livret A Véro (Cible)</span>
+           <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest mb-2">{savingsLabel} (Cible)</span>
            <span className="text-4xl font-black text-emerald-700">{Math.round(savingsAccount.initial).toLocaleString()} €</span>
         </Card>
       </div>
@@ -94,7 +114,7 @@ export default function SavingsView() {
                <div key={h.id} className="p-4 flex justify-between items-center hover:bg-slate-50/50 transition-colors">
                   <div>
                     <div className="font-bold text-slate-700">{h.note}</div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{h.date}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{formatShortDate(h.date)}</div>
                   </div>
                   <div className={`font-mono font-black text-lg ${h.type === 'depot' ? 'text-emerald-600' : 'text-orange-500'}`}>
                     {h.type === 'depot' ? '+' : '-'}{h.amount} €
