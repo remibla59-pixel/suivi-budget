@@ -16,6 +16,7 @@ const CONFIG = {
   comptes: [
     { id: 'courant', label: 'Compte Courant', initial: 1000, type: 'courant' },
     { id: 'livretRemi', label: 'Livret A Rémi (Provisions)', initial: 2000, type: 'provision' },
+    { id: 'livretA', label: 'Livret A Véro', initial: 17000, type: 'epargne' },
   ],
   postes: [
     { id: 'p1', label: 'Prêt Immo', type: 'fixe', montant: 880 },
@@ -28,6 +29,8 @@ const CONFIG = {
   ],
   provisionsByYear: { 2026: [{ id: 'prov_auto', label: 'Assurance auto', amount: 600, spent: 0, history: [] }] },
   provisionAccountId: 'livretRemi',
+  savingsAccountId: 'livretA',
+  savingsHistory: [],
   bankImportKeys: [],
 };
 
@@ -66,7 +69,9 @@ describe('encodage des cibles', () => {
     expect(encodeTarget({ kind: 'fixed', id: 'p1' })).toBe('fixed:p1');
     expect(encodeTarget({ kind: 'none' })).toBe('none');
     expect(encodeTarget({ kind: 'income' })).toBe('income');
+    expect(encodeTarget({ kind: 'transfer', id: 'livretA' })).toBe('transfer:livretA');
     expect(decodeTarget('envelope:env_loisirs')).toEqual({ kind: 'envelope', id: 'env_loisirs' });
+    expect(decodeTarget('transfer:livretRemi')).toEqual({ kind: 'transfer', id: 'livretRemi' });
     expect(decodeTarget('none')).toEqual({ kind: 'none', id: null });
     expect(decodeTarget('')).toEqual({ kind: 'none', id: null });
   });
@@ -310,6 +315,16 @@ describe('règles mémorisées (rappels de classement)', () => {
     expect(rows[0]).toMatchObject({ target: 'flexible:flex_courses', targetSource: 'memory' });
   });
 
+  it('mémorise un « ignorer » volontaire, pour ne plus revoir les virements de passage', () => {
+    const ignored = learnBankImportRules([], [
+      { ...txn({ fitId: 'PASS', label: 'VIR RECU LIVRET A REMI', amount: 480 }), target: 'none', targetSource: 'manual' },
+    ]);
+
+    expect(ignored).toEqual([expect.objectContaining({ match: 'RECU LIVRET REMI', target: 'none' })]);
+    // Une ligne simplement non reconnue (aucun choix de l'utilisateur) reste hors de la mémoire.
+    expect(learnBankImportRules([], [{ ...txn({ fitId: 'X' }), target: 'none', targetSource: 'none' }])).toEqual([]);
+  });
+
   it('retombe sur la suggestion quand la règle mémorisée est caduque', () => {
     const config = {
       ...CONFIG,
@@ -319,5 +334,105 @@ describe('règles mémorisées (rappels de classement)', () => {
     const { rows } = buildImportCandidates([txn()], { config });
 
     expect(rows[0]).toMatchObject({ target: 'fixed:p1', targetSource: 'auto' });
+  });
+});
+
+describe('virements internes (cible « transfer »)', () => {
+  const transferRow = (over = {}) => txn({
+    fitId: 'VIR-1',
+    date: '2026-03-06',
+    amount: -480,
+    label: 'VIR LIVRET A REMI',
+    target: 'transfer:livretRemi',
+    ...over,
+  });
+
+  it('reconnaît un virement vers un autre compte du foyer', () => {
+    expect(suggestTarget({ label: 'VIR LIVRET A REMI', amount: -480 }, CONFIG))
+      .toMatchObject({ kind: 'transfer', id: 'livretRemi' });
+  });
+
+  it('ne devine pas un virement sans mot de virement ni nom de compte', () => {
+    expect(suggestTarget({ label: 'LIVRET A REMI', amount: -480 }, CONFIG).kind).toBe('none');
+    expect(suggestTarget({ label: 'VIR SEPA SALAIRE', amount: 2400 }, CONFIG).kind).toBe('none');
+  });
+
+  it('déplace l’argent entre les deux comptes et marque le financement des provisions', () => {
+    const result = applyBankImport({ config: CONFIG, monthlyData: MONTHLY, rows: [transferRow()] });
+
+    expect(result.config.comptes.find((c) => c.id === 'courant').initial).toBe(520);
+    expect(result.config.comptes.find((c) => c.id === 'livretRemi').initial).toBe(2480);
+    expect(result.monthlyData['2026-03']).toMatchObject({
+      provisionDone: true,
+      provisionAmount: 480,
+      provisionDate: '2026-03-06',
+      provisionYear: '2027',
+    });
+    // Un virement n'est ni une dépense ni une entrée : il ne compte que dans les soldes.
+    expect(result.summary).toMatchObject({ count: 1, totalOut: 0, totalIn: 0 });
+    expect(result.config.bankImportKeys).toEqual(['fit:VIR-1']);
+  });
+
+  it('ne débite pas deux fois quand le virement de provisions est déjà confirmé', () => {
+    const monthlyData = { '2026-03': { provisionDone: true, provisionAmount: 480 } };
+    const result = applyBankImport({ config: CONFIG, monthlyData, rows: [transferRow()] });
+
+    expect(result.skipped).toEqual([expect.objectContaining({ reason: 'alreadyDone' })]);
+    expect(result.config.comptes.find((c) => c.id === 'courant').initial).toBe(1000);
+    expect(result.config.comptes.find((c) => c.id === 'livretRemi').initial).toBe(2000);
+  });
+
+  it('enregistre un virement sortant vers l’épargne dans son historique', () => {
+    const result = applyBankImport({
+      config: CONFIG,
+      monthlyData: MONTHLY,
+      rows: [txn({ fitId: 'EP-1', label: 'VIR LIVRET A VERO', amount: -300, target: 'transfer:livretA' })],
+    });
+
+    expect(result.config.comptes.find((c) => c.id === 'courant').initial).toBe(700);
+    expect(result.config.comptes.find((c) => c.id === 'livretA').initial).toBe(17300);
+    expect(result.config.savingsHistory[0]).toMatchObject({
+      id: 'fit:EP-1', type: 'depot', amount: 300, date: '2026-03-05',
+    });
+  });
+
+  it('crédite le compte courant sur un virement entrant', () => {
+    const result = applyBankImport({
+      config: CONFIG,
+      monthlyData: MONTHLY,
+      rows: [txn({ fitId: 'IN-1', label: 'VIR RECU LIVRET A VERO', amount: 120, target: 'transfer:livretA' })],
+    });
+
+    expect(result.config.comptes.find((c) => c.id === 'courant').initial).toBe(1120);
+    expect(result.config.comptes.find((c) => c.id === 'livretA').initial).toBe(16880);
+    expect(result.config.savingsHistory[0]).toMatchObject({ type: 'retrait', amount: 120 });
+  });
+
+  it('refuse un virement vers le compte courant lui-même', () => {
+    const result = applyBankImport({
+      config: CONFIG,
+      monthlyData: MONTHLY,
+      rows: [txn({ fitId: 'BAD-1', target: 'transfer:courant' })],
+    });
+
+    expect(result.skipped).toEqual([expect.objectContaining({ reason: 'target' })]);
+    expect(result.config.comptes.find((c) => c.id === 'courant').initial).toBe(1000);
+  });
+
+  it('mémorise le virement et le réapplique au prochain import', () => {
+    const learned = learnBankImportRules([], [transferRow()]);
+
+    expect(learned).toEqual([expect.objectContaining({ match: 'LIVRET REMI', target: 'transfer:livretRemi' })]);
+
+    const config = { ...CONFIG, bankImportKeys: [], bankImportRules: learned };
+    const { rows } = buildImportCandidates([transferRow({ fitId: 'VIR-2', date: '2026-04-06' })], { config });
+
+    expect(rows[0]).toMatchObject({ target: 'transfer:livretRemi', targetSource: 'memory' });
+  });
+
+  it('ignore une règle de virement dont le compte n’existe plus', () => {
+    const rules = [{ match: 'LIVRET REMI', target: 'transfer:ldd' }];
+
+    expect(ruleTargetFor({ label: 'VIR LIVRET A REMI' }, rules, CONFIG)).toBeNull();
   });
 });

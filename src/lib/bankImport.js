@@ -3,7 +3,7 @@
 // mensuelles à partir des lignes validées par l'utilisateur, ce qui permet de tester
 // tout l'impact comptable (soldes, enveloppes, provisions) sans React ni Firestore.
 
-import { round } from './budgetMath';
+import { round, monthlyProvisionTarget } from './budgetMath';
 
 const ACCENTS = /[\u0300-\u036f]/g;
 
@@ -26,8 +26,9 @@ export const transactionKey = (txn) =>
     ? `fit:${txn.fitId}`
     : `fp:${txn?.date ?? ''}|${round(txn?.amount ?? 0)}|${normalizeLabel(txn?.label ?? txn?.name ?? '')}`;
 
-// Cibles encodées pour un <select> : 'none', 'income', 'fixed:p1', 'envelope:env_x'…
-const ENCODED_KINDS = ['fixed', 'flexible', 'envelope', 'provision'];
+// Cibles encodées pour un <select> : 'none', 'income', 'fixed:p1', 'envelope:env_x',
+// 'transfer:livretRemi' (virement interne entre deux de vos comptes)…
+const ENCODED_KINDS = ['fixed', 'flexible', 'envelope', 'provision', 'transfer'];
 
 export const encodeTarget = ({ kind, id } = {}) =>
   ENCODED_KINDS.includes(kind) && id ? `${kind}:${id}` : (kind || 'none');
@@ -38,10 +39,12 @@ export const decodeTarget = (value) => {
 };
 
 // Suggestion automatique : on rapproche le libellé bancaire des intitulés configurés
-// (charges fixes, dépenses courantes, enveloppes). Un montant identique à ±1 € renforce
-// fortement une charge fixe. Les factures provisionnées restent un choix manuel.
+// (charges fixes, dépenses courantes, enveloppes) et des autres comptes du foyer
+// (virements internes). Un montant identique à ±1 € renforce fortement une charge fixe.
+// Les factures provisionnées restent un choix manuel.
 export const suggestTarget = (txn, config = {}) => {
-  const haystack = new Set(significantWords(`${txn?.label ?? ''} ${txn?.name ?? ''} ${txn?.memo ?? ''}`));
+  const rawLabel = `${txn?.label ?? ''} ${txn?.name ?? ''} ${txn?.memo ?? ''}`;
+  const haystack = new Set(significantWords(rawLabel));
   const amount = Math.abs(round(txn?.amount ?? 0));
   const scored = [];
 
@@ -57,6 +60,18 @@ export const suggestTarget = (txn, config = {}) => {
     .forEach((p) => consider('fixed', p, Math.abs((p.montant ?? 0) - amount) <= 1 ? 2 : 0));
   (config.budgetsFlexibles || []).forEach((b) => consider('flexible', b));
   (config.envelopes || []).forEach((e) => consider('envelope', e));
+
+  // Virement interne : il faut à la fois un mot du libellé du compte (« LIVRET », « REMI »…)
+  // et un mot de virement, sinon un simple achat mentionnant « Livret » serait détourné.
+  if (/\b(VIREMENT|VIR|TRANSFERT)\b/.test(normalizeLabel(rawLabel))) {
+    (config.comptes || [])
+      .filter((c) => c.type !== 'courant')
+      .forEach((c) => {
+        const matched = significantWords(c.label).filter((w) => haystack.has(w));
+        if (matched.length === 0) return;
+        scored.push({ kind: 'transfer', id: c.id, label: c.label, score: matched.length + 3 });
+      });
+  }
 
   scored.sort((a, b) => b.score - a.score);
   return scored.length ? scored[0] : { kind: 'none', id: null, label: '' };
@@ -84,6 +99,8 @@ export const targetExists = (target, config = {}) => {
   if (kind === 'envelope') return (config.envelopes || []).some((e) => e.id === id);
   if (kind === 'provision')
     return Object.values(config.provisionsByYear || {}).some((list) => (list || []).some((p) => p.id === id));
+  // Un virement interne ne peut viser qu'un autre compte du foyer (jamais le compte courant lui-même).
+  if (kind === 'transfer') return (config.comptes || []).some((c) => c.id === id && c.type !== 'courant');
   return false;
 };
 
@@ -98,14 +115,17 @@ export const ruleTargetFor = (txn, rules = [], config) => {
   return rule.target;
 };
 
-// Apprend les classements des lignes validées. Une ligne ignorée (« none ») n'est
-// jamais mémorisée, et reclasser un libellé déjà connu met à jour la règle existante.
+// Apprend les classements des lignes validées : reclasser un libellé déjà connu met à jour
+// la règle existante. Une ligne ignorée n'est retenue que si l'utilisateur l'a décidée
+// lui-même — c'est ainsi qu'un virement de passage (déjà enregistré dans l'app) cesse de
+// réapparaître à chaque import, sans que les lignes simplement non reconnues soient figées.
 export const learnBankImportRules = (rules = [], rows = []) => {
   const next = [...(rules || [])];
   (rows || []).forEach((row) => {
     if (!row || row.include === false) return;
     const { kind } = decodeTarget(row.target);
-    if (!kind || kind === 'none') return;
+    if (!kind) return;
+    if (kind === 'none' && row.targetSource !== 'manual') return;
     const match = ruleKey(row);
     if (!match) return;
     const rule = { id: match, match, target: row.target, label: row.label || row.name || row.memo || '' };
@@ -153,9 +173,12 @@ export const buildImportCandidates = (transactions, { importedKeys = [], config 
 // - envelope   : ajoute une dépense d'enveloppe et diminue la cagnotte (l'argent y a déjà été versé)
 // - provision  : ajoute une facture payée, débite le compte de provisions et incrémente le « spent »
 // - income     : ajoute une entrée d'argent (ligne de revenu, sans impact sur les soldes tenus à part)
+// - transfer   : déplace l'argent entre le compte courant et un autre compte du foyer
+//                (le virement vers le compte de provisions marque le mois comme financé)
 export const applyBankImport = ({ config = {}, monthlyData = {}, rows = [] } = {}) => {
   let comptes = [...(config.comptes || [])];
   let envelopes = [...(config.envelopes || [])];
+  let savingsHistory = [...(config.savingsHistory || [])];
   const provisionsByYear = { ...(config.provisionsByYear || {}) };
   const nextMonthlyData = { ...monthlyData };
 
@@ -228,6 +251,39 @@ export const applyBankImport = ({ config = {}, monthlyData = {}, rows = [] } = {
       };
       comptes = comptes.map((c) =>
         c.id === config.provisionAccountId ? { ...c, initial: round((c.initial || 0) - amount) } : c);
+    } else if (kind === 'transfer') {
+      // Virement entre deux comptes du foyer : le signe de l'opération donne le sens
+      // (négatif = sortie du compte courant, positif = retour vers le compte courant).
+      const account = (config.comptes || []).find((c) => c.id === id && c.type !== 'courant');
+      if (!account) {
+        skipped.push({ ...row, reason: 'target' });
+        return;
+      }
+      const signed = round(row.amount || 0);
+      const isProvisionFunding = id === config.provisionAccountId && signed < 0;
+      if (isProvisionFunding) {
+        // Le virement mensuel de financement des provisions : on enregistre le mois comme
+        // fait (comme le bouton « Confirmer le virement ») plutôt que comme une dépense.
+        if (mData.provisionDone) {
+          skipped.push({ ...row, reason: 'alreadyDone' });
+          return;
+        }
+        nextMonthlyData[monthKey] = {
+          ...mData,
+          provisionDone: true,
+          provisionAmount: amount,
+          provisionDate: row.date,
+          provisionYear: monthlyProvisionTarget(config.provisionsByYear, monthKey).year,
+        };
+      }
+      if (id === config.savingsAccountId) {
+        savingsHistory = [
+          { id: key, date: row.date, type: signed < 0 ? 'depot' : 'retrait', amount, note: label },
+          ...savingsHistory,
+        ].slice(0, 50);
+      }
+      moveCourant(signed);
+      comptes = comptes.map((c) => (c.id === id ? { ...c, initial: round((c.initial || 0) - signed) } : c));
     } else if (kind === 'income') {
       nextMonthlyData[monthKey] = {
         ...mData,
@@ -238,8 +294,9 @@ export const applyBankImport = ({ config = {}, monthlyData = {}, rows = [] } = {
       return;
     }
 
+    // Un virement interne n'est ni une dépense ni une entrée d'argent : il ne compte que dans les soldes.
     if (kind === 'income') totalIn = round(totalIn + amount);
-    else totalOut = round(totalOut + amount);
+    else if (kind !== 'transfer') totalOut = round(totalOut + amount);
     applied.push({ ...row, key, monthKey, kind, targetId: id, amount });
   });
 
@@ -250,6 +307,7 @@ export const applyBankImport = ({ config = {}, monthlyData = {}, rows = [] } = {
       ...config,
       comptes,
       envelopes,
+      savingsHistory,
       provisionsByYear,
       bankImportKeys: [...(config.bankImportKeys || []), ...appliedKeys].slice(-2000),
     },

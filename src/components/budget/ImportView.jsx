@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useBudget } from '../../hooks/useBudget';
-import { FileUp, Landmark, CheckCircle2, TriangleAlert, Lock, EyeOff, Sparkles, Trash2 } from 'lucide-react';
+import { FileUp, Landmark, CheckCircle2, TriangleAlert, Lock, EyeOff, Sparkles, Trash2, ArrowLeftRight } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { parseOfx, transactionsPeriod } from '../../lib/ofxParser';
@@ -11,6 +11,7 @@ import { formatShortDate } from '../../lib/budgetMeta';
 const SKIP_REASONS = {
   closed: 'mois clôturé',
   alreadyPaid: 'déjà payée',
+  alreadyDone: 'virement déjà enregistré',
   date: 'date illisible',
   target: 'cible inconnue',
 };
@@ -41,12 +42,24 @@ export default function ImportView() {
 
   const currentYear = currentMonth.split('-')[0];
 
+  // Autres comptes du foyer : supports des virements internes (le relevé importé est celui du compte courant).
+  const otherAccounts = useMemo(
+    () => (config.comptes || []).filter((c) => c.type !== 'courant'),
+    [config.comptes]
+  );
+  const transferAccounts = useMemo(
+    () => new Map(otherAccounts.map((c) => [`transfer:${c.id}`, c.label])),
+    [otherAccounts]
+  );
+
   // Cibles possibles pour chaque ligne : elles viennent uniquement de la config actuelle.
   const targetOptions = useMemo(() => {
     const options = [
-      { value: 'none', label: 'Ignorer cette ligne' },
+      { value: 'none', label: "Ignorer cette ligne (déjà enregistrée dans l'app)" },
       { value: 'income', label: "Entrée d'argent (revenu)" },
     ];
+    // Virements internes : les autres comptes du foyer (le compte courant est celui du relevé).
+    otherAccounts.forEach((c) => options.push({ value: `transfer:${c.id}`, label: `Virement interne — ${c.label}` }));
     (config.postes || [])
       .filter((p) => p.type === 'fixe')
       .forEach((p) => options.push({ value: `fixed:${p.id}`, label: `Charge fixe — ${p.label}` }));
@@ -57,7 +70,7 @@ export default function ImportView() {
     (((config.provisionsByYear || {})[currentYear]) || [])
       .forEach((p) => options.push({ value: `provision:${p.id}`, label: `Facture provisionnée — ${p.label}` }));
     return options;
-  }, [config, currentYear]);
+  }, [config, currentYear, otherAccounts]);
 
   // Libellé lisible d'une cible mémorisée (elle peut pointer vers un élément supprimé depuis).
   const targetLabels = useMemo(
@@ -211,6 +224,16 @@ export default function ImportView() {
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-4 space-y-2">
+            <div className="flex items-start gap-2 bg-blue-50/70 border border-blue-100 text-blue-900 rounded-2xl p-3 mb-2">
+              <ArrowLeftRight size={14} className="shrink-0 mt-0.5 text-blue-500" />
+              <p className="text-[11px] font-medium leading-relaxed">
+                <b>Virements entre vos comptes</b> : choisissez « Virement interne — … » pour un mouvement vers ou depuis un
+                autre de vos comptes (provisions, épargne…). Le sens est déduit du relevé et les deux soldes sont ajustés,
+                sans compter de dépense. Un virement de passage — l'argent sort des provisions, arrive sur le compte courant,
+                puis la facture est payée — reste simplement sur « Ignorer » : la facture provisionnée se classe sur la ligne
+                de paiement, et l'app débite alors le compte de provisions.
+              </p>
+            </div>
             {visibleRows.length === 0 && (
               <div className="text-center text-xs italic text-slate-400 py-8">
                 Aucune ligne à importer : tout est déjà rapproché ou ignoré.
@@ -249,6 +272,12 @@ export default function ImportView() {
                       )}
                       {row.targetSource === 'auto' && !isIgnored && (
                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">auto</span>
+                      )}
+                      {!isIgnored && transferAccounts.has(row.target) && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5">
+                          <ArrowLeftRight size={10} />
+                          {row.amount < 0 ? 'sortie vers' : 'entrée depuis'} {transferAccounts.get(row.target)}
+                        </span>
                       )}
                     </div>
                     <div className="text-sm font-bold text-slate-800 truncate" title={row.label}>
@@ -294,7 +323,8 @@ export default function ImportView() {
           </label>
           <p className="text-[11px] text-slate-400 font-medium text-center max-w-xl">
             Les charges fixes sont marquées payées et le compte courant est débité ; les enveloppes et les provisions sont
-            impactées comme lors d'une saisie manuelle. Les mois clôturés sont ignorés.
+            impactées comme lors d'une saisie manuelle. Un virement interne déplace l'argent entre vos comptes, et le
+            financement des provisions marque le mois comme fait. Les mois clôturés sont ignorés.
           </p>
         </div>
       )}

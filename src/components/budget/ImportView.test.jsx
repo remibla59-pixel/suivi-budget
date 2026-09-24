@@ -6,6 +6,10 @@ import { renderToString } from 'react-dom/server';
 vi.mock('../../hooks/useBudget', () => ({
   useBudget: () => ({
     config: {
+      comptes: [
+        { id: 'courant', label: 'Compte Courant', initial: 1000, type: 'courant' },
+        { id: 'livretRemi', label: 'Livret A Rémi (Provisions)', initial: 2000, type: 'provision' },
+      ],
       postes: [{ id: 'p1', label: 'Prêt Immo', type: 'fixe', montant: 880 }],
       budgetsFlexibles: [{ id: 'flex_courses', label: 'Courses', budget: 900 }],
       envelopes: [{ id: 'env_cadeaux', label: 'Cadeaux', category: 'secondaire', budgetMonthly: 50 }],
@@ -13,6 +17,7 @@ vi.mock('../../hooks/useBudget', () => ({
       bankImportKeys: [],
       bankImportRules: [
         { id: 'CARREFOUR MARKET', match: 'CARREFOUR MARKET', target: 'flexible:flex_courses', label: 'Carrefour Market' },
+        { id: 'LIVRET REMI', match: 'LIVRET REMI', target: 'transfer:livretRemi', label: 'VIR LIVRET A REMI' },
       ],
     },
     monthlyData: {},
@@ -44,5 +49,8 @@ describe('ImportView', () => {
     expect(html).toContain('Classements mémorisés');
     expect(html).toContain('Carrefour Market');
     expect(html).toContain('Dépense courante — Courses');
+    // Un virement mémorisé affiche le compte concerné, pas un encodage technique.
+    expect(html).toContain('VIR LIVRET A REMI');
+    expect(html).toContain('Virement interne — Livret A Rémi (Provisions)');
   });
 });
